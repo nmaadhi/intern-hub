@@ -1,21 +1,33 @@
-// Import the express library we just installed
-const express = require('express');
+// ───── Load environment variables FIRST (before any other code) ─────
+require('dotenv').config();
 
-// Create an Express app instance
+// ───── Imports ─────
+const express = require('express');
+const cors = require('cors');
+
+// Route files
+const authRoutes = require('./routes/auth');
+
+// ───── Setup ─────
 const app = express();
 
-// Middleware: tell Express to understand JSON in request bodies
+// Middleware: parse JSON request bodies
 app.use(express.json());
 
-// A simple test route — GET request to "/" returns a message
+// Middleware: allow cross-origin requests (React on :5173 → Express on :5000)
+app.use(cors());
+
+// ───── Routes ─────
 app.get('/', (req, res) => {
   res.json({ message: 'InternHub backend is running 🚀' });
 });
 
-// Define the port the server will listen on
-const PORT = 5000;
+// Mount the auth router under /api/auth
+// So: routes/auth.js → POST /login   becomes   POST /api/auth/login
+app.use('/api/auth', authRoutes);
 
-// Start the server
+// ───── Start server ─────
+const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`✅ Server running on http://localhost:${PORT}`);
 });
