@@ -1,33 +1,44 @@
-// ───── Load environment variables FIRST (before any other code) ─────
-require('dotenv').config();
+// ============================================
+// InternHub Backend - Entry Point
+// ============================================
 
-// ───── Imports ─────
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 
-// Route files
-const authRoutes = require('./routes/auth');
-
-// ───── Setup ─────
 const app = express();
 
-// Middleware: parse JSON request bodies
+app.use(cors({
+  origin: 'http://localhost:5173',
+  credentials: true,
+}));
+
 app.use(express.json());
 
-// Middleware: allow cross-origin requests (React on :5173 → Express on :5000)
-app.use(cors());
-
-// ───── Routes ─────
 app.get('/', (req, res) => {
-  res.json({ message: 'InternHub backend is running 🚀' });
+  res.json({
+    status: 'ok',
+    message: 'InternHub API is running',
+    timestamp: new Date().toISOString(),
+  });
 });
 
-// Mount the auth router under /api/auth
-// So: routes/auth.js → POST /login   becomes   POST /api/auth/login
-app.use('/api/auth', authRoutes);
+app.use('/api/auth', require('./routes/auth'));
+app.use('/api/admin', require('./routes/admin'));
+app.use('/api/mentor', require('./routes/mentor'));
+app.use('/api/intern', require('./routes/intern'));
 
-// ───── Start server ─────
+app.use((req, res) => {
+  res.status(404).json({ error: 'Route not found', path: req.originalUrl });
+});
+
+app.use((err, req, res, next) => {
+  console.error('💥 Unhandled error:', err);
+  res.status(500).json({ error: 'Internal server error' });
+});
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`✅ Server running on http://localhost:${PORT}`);
+  console.log(`   Health check: http://localhost:${PORT}/`);
 });

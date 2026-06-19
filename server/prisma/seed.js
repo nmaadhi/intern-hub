@@ -1,41 +1,44 @@
-// Import Prisma Client (to talk to the DB)
 const { PrismaClient } = require('@prisma/client');
-// Import bcrypt (to hash the password)
-const bcrypt = require('bcrypt');
+const { hashPassword } = require('../utils/password');
 
 const prisma = new PrismaClient();
 
 async function main() {
   console.log('🌱 Seeding database...');
 
-  // Hash the admin password before saving (NEVER store raw passwords)
-  const hashedPassword = await bcrypt.hash('admin123', 10);
+  const hashedPassword = await hashPassword('admin123');
 
-  // Use upsert: create the admin if it doesn't exist, do nothing if it does.
-  // This makes the script safe to re-run.
   const admin = await prisma.user.upsert({
     where: { email: 'admin@internhub.com' },
-    update: {}, // If user already exists, don't change anything
+    update: {
+      password: hashedPassword,
+      mustChangePassword: false,
+    },
     create: {
-      name: 'Super Admin',
+      name: 'Admin User',
       email: 'admin@internhub.com',
       password: hashedPassword,
       role: 'ADMIN',
-      status: 'active',
+      status: 'ACTIVE',
+      mustChangePassword: false,
     },
   });
 
-  console.log('✅ Admin created:', {
+  console.log('✅ Admin ready:', {
     id: admin.id,
     email: admin.email,
     role: admin.role,
   });
+
+  console.log('\n📝 Login credentials:');
+  console.log('   Email:    admin@internhub.com');
+  console.log('   Password: admin123');
+  console.log('\nAll mentors, cohorts, and interns will be created via the admin UI.\n');
 }
 
-// Run main() and handle errors / disconnect properly
 main()
   .catch((e) => {
-    console.error('❌ Seeding failed:', e);
+    console.error('❌ Seed failed:', e);
     process.exit(1);
   })
   .finally(async () => {

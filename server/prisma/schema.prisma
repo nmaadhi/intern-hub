@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -10,20 +7,240 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id        Int      @id @default(autoincrement())
-  name      String
-  email     String   @unique
-  internId  String?  @unique
-  password  String
-  role      Role
-  status    String   @default("active")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
 enum Role {
   ADMIN
   MENTOR
   INTERN
+}
+
+model User {
+  id                 String    @id @default(cuid())
+  name               String
+  email              String    @unique
+  internId           String?   @unique
+  phone              String?
+  dob                DateTime?
+  college            String?
+  password           String
+  role               Role      @default(INTERN)
+  status             String    @default("ACTIVE")
+  mustChangePassword Boolean   @default(true)
+
+  cohortId String?
+  cohort   Cohort? @relation("CohortInterns", fields: [cohortId], references: [id], onDelete: SetNull)
+
+  ledCohorts Cohort[] @relation("CohortMentor")
+
+  mentorId      String?
+  mentor        User?   @relation("InternMentor", fields: [mentorId], references: [id], onDelete: SetNull)
+  directInterns User[]  @relation("InternMentor")
+
+  resetTokens PasswordResetToken[]
+
+  createdAssignments   Assignment[]          @relation("AssignmentCreator")
+  submissions          Submission[]          @relation("InternSubmissions")
+  assignmentRecipients AssignmentRecipient[] @relation("AssignmentRecipientIntern")
+
+  assignedTasks  Task[] @relation("InternTasks")
+  createdTasks   Task[] @relation("MentorTasks")
+
+  createdMeetings   Meeting[]          @relation("MentorMeetings")
+  meetingRecipients MeetingRecipient[] @relation("MeetingRecipientIntern")
+
+  // Notes
+  createdNotes   Note[]          @relation("MentorNotes")
+  noteRecipients NoteRecipient[] @relation("NoteRecipientIntern")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Cohort {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  description String?
+  startDate   DateTime
+  endDate     DateTime?
+  status      String    @default("ACTIVE")
+
+  mentorId String?
+  mentor   User?   @relation("CohortMentor", fields: [mentorId], references: [id], onDelete: SetNull)
+
+  interns     User[]       @relation("CohortInterns")
+  assignments Assignment[]
+  meetings    Meeting[]
+  notes       Note[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([token])
+  @@index([userId])
+}
+
+model Assignment {
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  dueDate     DateTime?
+  status      String    @default("ACTIVE")
+
+  cohortId String?
+  cohort   Cohort? @relation(fields: [cohortId], references: [id], onDelete: Cascade)
+
+  createdById String
+  createdBy   User   @relation("AssignmentCreator", fields: [createdById], references: [id])
+
+  recipients  AssignmentRecipient[]
+  submissions Submission[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AssignmentRecipient {
+  id           String     @id @default(cuid())
+  assignmentId String
+  assignment   Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  internId     String
+  intern       User       @relation("AssignmentRecipientIntern", fields: [internId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([assignmentId, internId])
+  @@index([assignmentId])
+  @@index([internId])
+}
+
+model Submission {
+  id String @id @default(cuid())
+
+  assignmentId String
+  assignment   Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+
+  internId String
+  intern   User   @relation("InternSubmissions", fields: [internId], references: [id])
+
+  content  String?
+  linkUrl  String?
+  fileUrl  String?
+  fileName String?
+  status   String  @default("SUBMITTED")
+  feedback String?
+
+  submittedAt DateTime  @default(now())
+  reviewedAt  DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([assignmentId, internId])
+  @@index([assignmentId])
+  @@index([internId])
+}
+
+model Task {
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  status      String    @default("TODO")
+  dueDate     DateTime?
+
+  assignedToId String
+  assignedTo   User   @relation("InternTasks", fields: [assignedToId], references: [id], onDelete: Cascade)
+
+  createdById String
+  createdBy   User   @relation("MentorTasks", fields: [createdById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([assignedToId])
+  @@index([createdById])
+}
+
+model Meeting {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  meetingLink String
+  scheduledAt DateTime
+  duration    Int?
+
+  createdById String
+  createdBy   User   @relation("MentorMeetings", fields: [createdById], references: [id])
+
+  cohortId String?
+  cohort   Cohort? @relation(fields: [cohortId], references: [id], onDelete: SetNull)
+
+  recipients MeetingRecipient[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([createdById])
+  @@index([scheduledAt])
+}
+
+model MeetingRecipient {
+  id        String  @id @default(cuid())
+  meetingId String
+  meeting   Meeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  internId  String
+  intern    User    @relation("MeetingRecipientIntern", fields: [internId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([meetingId, internId])
+  @@index([meetingId])
+  @@index([internId])
+}
+
+// Note: mentor shares content (text + optional file) with a cohort or specific interns
+model Note {
+  id       String  @id @default(cuid())
+  title    String
+  content  String? // optional text body
+  fileUrl  String? // optional file (PDF, Word, etc.)
+  fileName String?
+
+  createdById String
+  createdBy   User   @relation("MentorNotes", fields: [createdById], references: [id])
+
+  // cohort-wide OR direct to specific interns
+  cohortId String?
+  cohort   Cohort? @relation(fields: [cohortId], references: [id], onDelete: SetNull)
+
+  recipients NoteRecipient[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([createdById])
+  @@index([cohortId])
+}
+
+// Join table for direct note recipients (when cohortId is null)
+model NoteRecipient {
+  id       String @id @default(cuid())
+  noteId   String
+  note     Note   @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  internId String
+  intern   User   @relation("NoteRecipientIntern", fields: [internId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([noteId, internId])
+  @@index([noteId])
+  @@index([internId])
 }

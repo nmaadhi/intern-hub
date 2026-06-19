@@ -6,7 +6,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-   "prisma": {
+  "prisma": {
     "seed": "node prisma/seed.js"
   },
   "keywords": [],
@@ -20,7 +20,8 @@
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "express-validator": "^7.3.2",
-    "jsonwebtoken": "^9.0.3"
+    "jsonwebtoken": "^9.0.3",
+    "resend": "^6.13.0"
   },
   "devDependencies": {
     "prisma": "^6.19.3"

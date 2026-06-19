@@ -1,37 +1,28 @@
-import { Navigate } from 'react-router-dom';
+﻿import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import useAuthStore from '../store/authStore';
 
-/**
- * Wrapper that only renders its children if the user is authenticated.
- * Optionally restricts access to specific role(s).
- *
- * Usage:
- *   <ProtectedRoute>                       → any logged-in user
- *     <Dashboard />
- *   </ProtectedRoute>
- *
- *   <ProtectedRoute allowedRoles={['ADMIN']}>   → only admins
- *     <AdminPanel />
- *   </ProtectedRoute>
- */
 function ProtectedRoute({ children, allowedRoles }) {
-  const token = useAuthStore((state) => state.token);
   const user = useAuthStore((state) => state.user);
+  const token = useAuthStore((state) => state.token);
+  const location = useLocation();
 
-  // Not logged in → send to login page
   if (!token || !user) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // Role restriction (optional)
   if (allowedRoles && !allowedRoles.includes(user.role)) {
-    // Logged in, but wrong role → kick to login
-    // (Later, we might redirect to a "no access" page instead)
-    return <Navigate to="/login" replace />;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="bg-white rounded-2xl shadow-sm p-8 max-w-md text-center">
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">Not Authorized</h2>
+          <p className="text-gray-600 mb-4">You do not have access to this page.</p>
+          <a href="/" className="inline-block bg-blue-600 text-white px-4 py-2 rounded-lg">Go to dashboard</a>
+        </div>
+      </div>
+    );
   }
 
-  // All checks passed → render the actual page
-  return children;
+  return children ? children : <Outlet />;
 }
 
 export default ProtectedRoute;
