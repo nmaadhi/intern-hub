@@ -15,7 +15,7 @@ function getResend() {
 }
 
 const FROM_ADDRESS = 'InternHub <onboarding@resend.dev>';
-const APP_URL = 'http://localhost:5173';
+const APP_URL = process.env.CLIENT_URL || 'http://localhost:5173';
 
 async function sendEmail({ to, subject, html, text }) {
   try {

@@ -77,7 +77,7 @@ router.post('/mentors', async (req, res) => {
         expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000),
       },
     });
-    const resetLink = `http://localhost:5173/reset-password?token=${setupToken}`;
+    const resetLink = `${process.env.CLIENT_URL || 'http://localhost:5173'}/reset-password?token=${setupToken}`;
 
     let emailSent = false;
     let emailError = null;
