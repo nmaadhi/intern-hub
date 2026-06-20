@@ -1,8 +1,9 @@
-// Import the Prisma Client class
 const { PrismaClient } = require('@prisma/client');
 
-// Create ONE instance for the whole app to share
-const prisma = new PrismaClient();
+const prisma = global.__prisma || new PrismaClient();
 
-// Export it so other files can use it
+if (process.env.NODE_ENV !== 'production') {
+  global.__prisma = prisma;
+}
+
 module.exports = prisma;

@@ -47,9 +47,12 @@ model User {
   createdMeetings   Meeting[]          @relation("MentorMeetings")
   meetingRecipients MeetingRecipient[] @relation("MeetingRecipientIntern")
 
-  // Notes
   createdNotes   Note[]          @relation("MentorNotes")
   noteRecipients NoteRecipient[] @relation("NoteRecipientIntern")
+
+  createdSprints      Sprint[]     @relation("MentorSprints")
+  createdSprintTasks  SprintTask[] @relation("MentorSprintTasks")
+  assignedSprintTasks SprintTask[] @relation("InternSprintTasks")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -70,6 +73,7 @@ model Cohort {
   assignments Assignment[]
   meetings    Meeting[]
   notes       Note[]
+  sprints     Sprint[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -206,18 +210,16 @@ model MeetingRecipient {
   @@index([internId])
 }
 
-// Note: mentor shares content (text + optional file) with a cohort or specific interns
 model Note {
   id       String  @id @default(cuid())
   title    String
-  content  String? // optional text body
-  fileUrl  String? // optional file (PDF, Word, etc.)
+  content  String?
+  fileUrl  String?
   fileName String?
 
   createdById String
   createdBy   User   @relation("MentorNotes", fields: [createdById], references: [id])
 
-  // cohort-wide OR direct to specific interns
   cohortId String?
   cohort   Cohort? @relation(fields: [cohortId], references: [id], onDelete: SetNull)
 
@@ -230,7 +232,6 @@ model Note {
   @@index([cohortId])
 }
 
-// Join table for direct note recipients (when cohortId is null)
 model NoteRecipient {
   id       String @id @default(cuid())
   noteId   String
@@ -243,4 +244,102 @@ model NoteRecipient {
   @@unique([noteId, internId])
   @@index([noteId])
   @@index([internId])
+}
+
+// ═══════════════════════════════════════════════════════════════
+// AGILE SPRINT SYSTEM
+// ═══════════════════════════════════════════════════════════════
+
+// Sprint: time-boxed work period with full agile lifecycle
+model Sprint {
+  id       String @id @default(cuid())
+  name     String
+  goal     String?
+
+  // Lifecycle phase — controls what UI is shown
+  // PLANNING: mentor adds cards + sets story points
+  // ACTIVE:   board is live, interns can move cards
+  // REVIEW:   board is read-only, mentor writes summary
+  // COMPLETED: archived, velocity calculated
+  phase     String @default("PLANNING") // PLANNING | ACTIVE | REVIEW | COMPLETED
+
+  startDate DateTime
+  endDate   DateTime
+
+  // Capacity = max story points the team can handle this sprint
+  // Set during planning so mentor doesn't overload interns
+  capacity  Int @default(0)
+
+  // Velocity = total story points completed (set when sprint completes)
+  velocity  Int @default(0)
+
+  // Optional review notes written by mentor at end of sprint
+  reviewNotes String?
+
+  cohortId String
+  cohort   Cohort @relation(fields: [cohortId], references: [id], onDelete: Cascade)
+
+  // Who created this sprint (admin OR mentor)
+  createdById String
+  createdBy   User   @relation("MentorSprints", fields: [createdById], references: [id])
+
+  tasks     SprintTask[]
+  snapshots SprintDailySnapshot[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([cohortId])
+  @@index([phase])
+}
+
+// SprintTask: a card on the Kanban board
+model SprintTask {
+  id          String  @id @default(cuid())
+  title       String
+  description String?
+
+  // Story points: effort estimate using Fibonacci sequence
+  // 0 = unpointed, 1 2 3 5 8 13 = effort levels
+  storyPoints Int @default(0)
+
+  status  String  @default("TODO") // TODO | IN_PROGRESS | REVIEW | DONE
+  blocked Boolean @default(false)
+  order   Int     @default(0)
+
+  sprintId String
+  sprint   Sprint @relation(fields: [sprintId], references: [id], onDelete: Cascade)
+
+  assignedToId String?
+  assignedTo   User?   @relation("InternSprintTasks", fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  createdById String
+  createdBy   User   @relation("MentorSprintTasks", fields: [createdById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([sprintId])
+  @@index([assignedToId])
+}
+
+// SprintDailySnapshot: one row per day per sprint for the burndown chart
+// Captured automatically when a card moves to DONE or at the start of each day
+model SprintDailySnapshot {
+  id              String   @id @default(cuid())
+  sprintId        String
+  sprint          Sprint   @relation(fields: [sprintId], references: [id], onDelete: Cascade)
+
+  date            DateTime // midnight of that day
+
+  // Points remaining = total sprint points - completed points
+  remainingPoints Int
+  completedPoints Int
+  totalPoints     Int
+
+  createdAt DateTime @default(now())
+
+  // One snapshot per day per sprint
+  @@unique([sprintId, date])
+  @@index([sprintId])
 }

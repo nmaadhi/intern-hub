@@ -15,6 +15,7 @@ import AdminDashboard from './pages/admin/AdminDashboard';
 import ManageMentors from './pages/admin/ManageMentors';
 import ManageCohorts from './pages/admin/ManageCohorts';
 import ManageInterns from './pages/admin/ManageInterns';
+import ManageSprints from './pages/admin/ManageSprints';
 
 import MentorDashboard from './pages/mentor/MentorDashboard';
 import ManageInternsMentorView from './pages/mentor/ManageInterns';
@@ -23,6 +24,7 @@ import AssignmentSubmissions from './pages/mentor/AssignmentSubmissions';
 import ManageTasks from './pages/mentor/ManageTasks';
 import ManageMeetings from './pages/mentor/ManageMeetings';
 import ManageNotes from './pages/mentor/ManageNotes';
+import SprintBoard from './pages/mentor/SprintBoard';
 
 import InternDashboard from './pages/intern/InternDashboard';
 import Profile from './pages/intern/Profile';
@@ -31,6 +33,7 @@ import SubmitAssignment from './pages/intern/SubmitAssignment';
 import MyTasks from './pages/intern/MyTasks';
 import MyMeetings from './pages/intern/MyMeetings';
 import MyNotes from './pages/intern/MyNotes';
+import InternSprintBoard from './pages/intern/SprintBoard';
 
 function App() {
   return (
@@ -50,6 +53,7 @@ function App() {
           <Route path="mentors" element={<ManageMentors />} />
           <Route path="cohorts" element={<ManageCohorts />} />
           <Route path="interns" element={<ManageInterns />} />
+          <Route path="sprints" element={<ManageSprints />} />
         </Route>
       </Route>
 
@@ -62,6 +66,7 @@ function App() {
           <Route path="tasks" element={<ManageTasks />} />
           <Route path="meetings" element={<ManageMeetings />} />
           <Route path="notes" element={<ManageNotes />} />
+          <Route path="sprint" element={<SprintBoard />} />
         </Route>
       </Route>
 
@@ -74,6 +79,7 @@ function App() {
           <Route path="tasks" element={<MyTasks />} />
           <Route path="meetings" element={<MyMeetings />} />
           <Route path="notes" element={<MyNotes />} />
+          <Route path="sprint" element={<InternSprintBoard />} />
         </Route>
       </Route>
 

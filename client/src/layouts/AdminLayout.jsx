@@ -6,27 +6,35 @@ function AdminLayout() {
   const logout = useAuthStore((s) => s.logout);
   const navigate = useNavigate();
 
-  const handleLogout = () => { logout(); navigate('/login'); };
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-6xl mx-auto px-4 py-3 flex justify-between items-center">
+      <header className="bg-white shadow-sm">
+        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <h1 className="text-xl font-bold text-blue-600">InternHub</h1>
-            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-medium">ADMIN</span>
+            <Link to="/admin" className="text-xl font-bold text-blue-600">InternHub</Link>
+            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">ADMIN</span>
           </div>
-          <div className="flex items-center gap-4">
+          <nav className="flex items-center gap-4 flex-wrap">
             <Link to="/admin" className="text-sm text-gray-600 hover:text-blue-600">Dashboard</Link>
             <Link to="/admin/mentors" className="text-sm text-gray-600 hover:text-blue-600">Mentors</Link>
             <Link to="/admin/cohorts" className="text-sm text-gray-600 hover:text-blue-600">Cohorts</Link>
             <Link to="/admin/interns" className="text-sm text-gray-600 hover:text-blue-600">Interns</Link>
-            <span className="text-sm text-gray-700 font-medium">{user?.name}</span>
-            <button onClick={handleLogout} className="text-sm bg-red-500 text-white px-3 py-1.5 rounded-lg hover:bg-red-600 transition">Logout</button>
+            <Link to="/admin/sprints" className="text-sm text-gray-600 hover:text-blue-600 font-medium">🏃 Sprints</Link>
+          </nav>
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-gray-600">{user?.name}</span>
+            <button onClick={handleLogout} className="text-sm bg-gray-100 text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-200 transition">Logout</button>
           </div>
         </div>
-      </nav>
-      <main className="max-w-6xl mx-auto px-4 py-8"><Outlet /></main>
+      </header>
+      <main className="max-w-6xl mx-auto px-4 py-8">
+        <Outlet />
+      </main>
     </div>
   );
 }
