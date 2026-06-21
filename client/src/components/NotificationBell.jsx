@@ -9,9 +9,7 @@ export default function NotificationBell() {
 
   useEffect(() => {
     const onNotification = ({ type, message, targetUserId }) => {
-      // Show if targeted at this user OR broadcast to everyone (targetUserId null)
       if (targetUserId && targetUserId !== user?.id) return;
-
       const newNotif = {
         id: Date.now(),
         type,
@@ -19,7 +17,7 @@ export default function NotificationBell() {
         time: new Date(),
         read: false,
       };
-      setNotifications((prev) => [newNotif, ...prev].slice(0, 20)); // keep last 20
+      setNotifications((prev) => [newNotif, ...prev].slice(0, 20));
     };
 
     socket.on('notification:new', onNotification);
@@ -48,6 +46,8 @@ export default function NotificationBell() {
     switch (type) {
       case 'TASK_ASSIGNED': return '📋';
       case 'TASK_BLOCKED': return '🚫';
+      case 'SPRINT_PHASE': return '🏃';
+      case 'ANNOUNCEMENT': return '📢';
       default: return '🔔';
     }
   };
@@ -70,31 +70,39 @@ export default function NotificationBell() {
 
       {open && (
         <>
-          {/* Backdrop */}
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-
-          {/* Dropdown */}
           <div className="absolute right-0 top-10 w-80 bg-white rounded-2xl shadow-xl border border-gray-200 z-50">
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
               <p className="font-bold text-gray-800">Notifications</p>
               {notifications.length > 0 && (
-                <button onClick={clearAll} className="text-xs text-gray-400 hover:text-red-500 transition">Clear all</button>
+                <button
+                  onClick={clearAll}
+                  className="text-xs text-gray-400 hover:text-red-500 transition"
+                >
+                  Clear all
+                </button>
               )}
             </div>
-
             <div className="max-h-72 overflow-y-auto">
               {notifications.length === 0 ? (
-                <p className="text-sm text-gray-400 text-center py-8">No notifications yet.</p>
+                <p className="text-sm text-gray-400 text-center py-8">
+                  No notifications yet.
+                </p>
               ) : (
                 notifications.map((n) => (
-                  <div key={n.id} className={`px-4 py-3 border-b border-gray-50 hover:bg-gray-50 transition ${n.read ? 'opacity-70' : ''}`}>
+                  <div
+                    key={n.id}
+                    className={`px-4 py-3 border-b border-gray-50 hover:bg-gray-50 transition ${n.read ? 'opacity-70' : ''}`}
+                  >
                     <div className="flex gap-3">
                       <span className="text-lg shrink-0">{typeIcon(n.type)}</span>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm text-gray-800">{n.message}</p>
                         <p className="text-xs text-gray-400 mt-0.5">{fmtTime(n.time)}</p>
                       </div>
-                      {!n.read && (<div className="w-2 h-2 bg-purple-500 rounded-full mt-1 shrink-0" />)}
+                      {!n.read && (
+                        <div className="w-2 h-2 bg-purple-500 rounded-full mt-1 shrink-0" />
+                      )}
                     </div>
                   </div>
                 ))

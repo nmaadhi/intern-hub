@@ -50,9 +50,14 @@ model User {
   createdNotes   Note[]          @relation("MentorNotes")
   noteRecipients NoteRecipient[] @relation("NoteRecipientIntern")
 
-  createdSprints      Sprint[]     @relation("MentorSprints")
-  createdSprintTasks  SprintTask[] @relation("MentorSprintTasks")
-  assignedSprintTasks SprintTask[] @relation("InternSprintTasks")
+  createdSprints       Sprint[]       @relation("MentorSprints")
+  createdSprintTasks   SprintTask[]   @relation("MentorSprintTasks")
+  assignedSprintTasks  SprintTask[]   @relation("InternSprintTasks")
+
+  standups             Standup[]      @relation("InternStandups")
+  createdPolls         Poll[]         @relation("MentorPolls")
+  pollResponses        PollResponse[] @relation("InternPollResponses")
+  createdAnnouncements Announcement[] @relation("MentorAnnouncements")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -69,11 +74,13 @@ model Cohort {
   mentorId String?
   mentor   User?   @relation("CohortMentor", fields: [mentorId], references: [id], onDelete: SetNull)
 
-  interns     User[]       @relation("CohortInterns")
-  assignments Assignment[]
-  meetings    Meeting[]
-  notes       Note[]
-  sprints     Sprint[]
+  interns       User[]         @relation("CohortInterns")
+  assignments   Assignment[]
+  meetings      Meeting[]
+  notes         Note[]
+  sprints       Sprint[]
+  polls         Poll[]
+  announcements Announcement[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -246,45 +253,26 @@ model NoteRecipient {
   @@index([internId])
 }
 
-// ═══════════════════════════════════════════════════════════════
-// AGILE SPRINT SYSTEM
-// ═══════════════════════════════════════════════════════════════
-
-// Sprint: time-boxed work period with full agile lifecycle
 model Sprint {
-  id       String @id @default(cuid())
-  name     String
-  goal     String?
-
-  // Lifecycle phase — controls what UI is shown
-  // PLANNING: mentor adds cards + sets story points
-  // ACTIVE:   board is live, interns can move cards
-  // REVIEW:   board is read-only, mentor writes summary
-  // COMPLETED: archived, velocity calculated
-  phase     String @default("PLANNING") // PLANNING | ACTIVE | REVIEW | COMPLETED
-
-  startDate DateTime
-  endDate   DateTime
-
-  // Capacity = max story points the team can handle this sprint
-  // Set during planning so mentor doesn't overload interns
-  capacity  Int @default(0)
-
-  // Velocity = total story points completed (set when sprint completes)
-  velocity  Int @default(0)
-
-  // Optional review notes written by mentor at end of sprint
+  id          String   @id @default(cuid())
+  name        String
+  goal        String?
+  phase       String   @default("PLANNING")
+  startDate   DateTime
+  endDate     DateTime
+  capacity    Int      @default(0)
+  velocity    Int      @default(0)
   reviewNotes String?
 
   cohortId String
   cohort   Cohort @relation(fields: [cohortId], references: [id], onDelete: Cascade)
 
-  // Who created this sprint (admin OR mentor)
   createdById String
   createdBy   User   @relation("MentorSprints", fields: [createdById], references: [id])
 
   tasks     SprintTask[]
   snapshots SprintDailySnapshot[]
+  standups  Standup[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -293,19 +281,14 @@ model Sprint {
   @@index([phase])
 }
 
-// SprintTask: a card on the Kanban board
 model SprintTask {
   id          String  @id @default(cuid())
   title       String
   description String?
-
-  // Story points: effort estimate using Fibonacci sequence
-  // 0 = unpointed, 1 2 3 5 8 13 = effort levels
-  storyPoints Int @default(0)
-
-  status  String  @default("TODO") // TODO | IN_PROGRESS | REVIEW | DONE
-  blocked Boolean @default(false)
-  order   Int     @default(0)
+  storyPoints Int     @default(0)
+  status      String  @default("TODO")
+  blocked     Boolean @default(false)
+  order       Int     @default(0)
 
   sprintId String
   sprint   Sprint @relation(fields: [sprintId], references: [id], onDelete: Cascade)
@@ -323,23 +306,107 @@ model SprintTask {
   @@index([assignedToId])
 }
 
-// SprintDailySnapshot: one row per day per sprint for the burndown chart
-// Captured automatically when a card moves to DONE or at the start of each day
 model SprintDailySnapshot {
   id              String   @id @default(cuid())
   sprintId        String
   sprint          Sprint   @relation(fields: [sprintId], references: [id], onDelete: Cascade)
-
-  date            DateTime // midnight of that day
-
-  // Points remaining = total sprint points - completed points
+  date            DateTime
   remainingPoints Int
   completedPoints Int
   totalPoints     Int
+  createdAt       DateTime @default(now())
+
+  @@unique([sprintId, date])
+  @@index([sprintId])
+}
+
+model Standup {
+  id        String  @id @default(cuid())
+  yesterday String
+  today     String
+  blockers  String?
+
+  internId String
+  intern   User   @relation("InternStandups", fields: [internId], references: [id], onDelete: Cascade)
+
+  sprintId String?
+  sprint   Sprint? @relation(fields: [sprintId], references: [id], onDelete: SetNull)
+
+  date      DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  @@index([internId])
+  @@index([sprintId])
+}
+
+model Poll {
+  id       String @id @default(cuid())
+  question String
+  status   String @default("DRAFT")
+
+  cohortId String
+  cohort   Cohort @relation(fields: [cohortId], references: [id], onDelete: Cascade)
+
+  createdById String
+  createdBy   User   @relation("MentorPolls", fields: [createdById], references: [id])
+
+  options   PollOption[]
+  responses PollResponse[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([cohortId])
+  @@index([status])
+}
+
+model PollOption {
+  id    String @id @default(cuid())
+  text  String
+  order Int    @default(0)
+
+  pollId String
+  poll   Poll   @relation(fields: [pollId], references: [id], onDelete: Cascade)
+
+  responses PollResponse[]
+
+  @@index([pollId])
+}
+
+model PollResponse {
+  id String @id @default(cuid())
+
+  pollId String
+  poll   Poll   @relation(fields: [pollId], references: [id], onDelete: Cascade)
+
+  optionId String
+  option   PollOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+
+  internId String
+  intern   User   @relation("InternPollResponses", fields: [internId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
 
-  // One snapshot per day per sprint
-  @@unique([sprintId, date])
-  @@index([sprintId])
+  @@unique([pollId, internId])
+  @@index([pollId])
+  @@index([internId])
+}
+
+model Announcement {
+  id      String  @id @default(cuid())
+  title   String
+  content String
+  pinned  Boolean @default(false)
+
+  cohortId String
+  cohort   Cohort @relation(fields: [cohortId], references: [id], onDelete: Cascade)
+
+  createdById String
+  createdBy   User   @relation("MentorAnnouncements", fields: [createdById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([cohortId])
+  @@index([createdAt])
 }

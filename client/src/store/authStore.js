@@ -1,5 +1,5 @@
 ﻿import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import { connectSocket, disconnectSocket } from '../lib/socket';
 
 const useAuthStore = create(
@@ -10,7 +10,6 @@ const useAuthStore = create(
 
       login: (token, user) => {
         set({ token, user });
-        // Connect socket immediately on login
         connectSocket({
           userId: user.id,
           cohortId: user.cohortId || null,
@@ -20,21 +19,18 @@ const useAuthStore = create(
       logout: () => {
         disconnectSocket();
         set({ token: null, user: null });
+        sessionStorage.removeItem('auth-storage');
       },
 
       setUser: (user) => set({ user }),
     }),
     {
       name: 'auth-storage',
-      // Reconnect socket on page refresh (token already in storage)
-      onRehydrateStorage: () => (state) => {
-        if (state?.token && state?.user) {
-          connectSocket({
-            userId: state.user.id,
-            cohortId: state.user.cohortId || null,
-          });
-        }
-      },
+      // sessionStorage instead of localStorage
+      // → new tab = login page
+      // → close tab = logged out
+      // → refresh same tab = stays logged in
+      storage: createJSONStorage(() => sessionStorage),
     }
   )
 );

@@ -35,6 +35,9 @@ app.use('/api/admin', require('./routes/admin'));
 app.use('/api/mentor', require('./routes/mentor'));
 app.use('/api/intern', require('./routes/intern'));
 app.use('/api/sprint', require('./routes/sprint'));
+app.use('/api/standup', require('./routes/standup'));
+app.use('/api/poll', require('./routes/poll'));
+app.use('/api/announcement', require('./routes/announcement'));
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Route not found', path: req.originalUrl });

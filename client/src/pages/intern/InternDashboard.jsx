@@ -1,22 +1,23 @@
-﻿import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import api from '../../lib/api';
-import useAuthStore from '../../store/authStore';
+﻿import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import api from "../../lib/api";
+import useAuthStore from "../../store/authStore";
+import PinnedAnnouncements from "../../components/PinnedAnnouncements";
 
 function InternDashboard() {
   const user = useAuthStore((s) => s.user);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
 
   useEffect(() => {
     const load = async () => {
       try {
         const [pRes, aRes, tRes, mRes] = await Promise.all([
-          api.get('/intern/me'),
-          api.get('/intern/assignments'),
-          api.get('/intern/tasks'),
-          api.get('/intern/meetings'),
+          api.get("/intern/me"),
+          api.get("/intern/assignments"),
+          api.get("/intern/tasks"),
+          api.get("/intern/meetings"),
         ]);
         setData({
           profile: pRes.data.profile,
@@ -25,7 +26,7 @@ function InternDashboard() {
           meetings: mRes.data.meetings || [],
         });
       } catch (err) {
-        setError(err.response?.data?.error || 'Failed to load dashboard');
+        setError(err.response?.data?.error || "Failed to load dashboard");
       } finally {
         setLoading(false);
       }
@@ -39,13 +40,13 @@ function InternDashboard() {
   const { profile, assignments, tasks, meetings } = data;
 
   const notSubmitted = assignments.filter((a) => !a.mySubmission).length;
-  const needsRevision = assignments.filter((a) => a.mySubmission?.status === 'NEEDS_REVISION').length;
-  const approved = assignments.filter((a) => a.mySubmission?.status === 'APPROVED').length;
-  const todoTasks = tasks.filter((t) => t.status === 'TODO').length;
-  const inProgressTasks = tasks.filter((t) => t.status === 'IN_PROGRESS').length;
+  const needsRevision = assignments.filter((a) => a.mySubmission?.status === "NEEDS_REVISION").length;
+  const approved = assignments.filter((a) => a.mySubmission?.status === "APPROVED").length;
+  const todoTasks = tasks.filter((t) => t.status === "TODO").length;
+  const inProgressTasks = tasks.filter((t) => t.status === "IN_PROGRESS").length;
   const nextMeeting = meetings.find((m) => !m.isPast);
 
-  const fmtDateTime = (s) => s ? new Date(s).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '';
+  const fmtDateTime = (s) => s ? new Date(s).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }) : "";
 
   return (
     <div className="space-y-6">
@@ -54,7 +55,10 @@ function InternDashboard() {
         <p className="text-gray-600 text-sm mt-1">Your personal dashboard</p>
       </div>
 
-      {/* Mentor + Cohort cards */}
+      {profile?.cohort?.id && (
+        <PinnedAnnouncements cohortId={profile.cohort.id} />
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="bg-white rounded-2xl shadow-sm p-5">
           <p className="text-xs text-gray-500 uppercase font-medium tracking-wider mb-2">Your Mentor</p>
@@ -74,7 +78,9 @@ function InternDashboard() {
             <div>
               <p className="font-bold text-gray-800">{profile.cohort.name}</p>
               {profile.cohort.description && <p className="text-sm text-gray-500">{profile.cohort.description}</p>}
-              <span className={`text-xs px-2 py-0.5 rounded-full font-medium mt-1 inline-block ${profile.cohort.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-200 text-gray-600'}`}>{profile.cohort.status}</span>
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium mt-1 inline-block ${profile.cohort.status === "ACTIVE" ? "bg-emerald-100 text-emerald-700" : "bg-gray-200 text-gray-600"}`}>
+                {profile.cohort.status}
+              </span>
             </div>
           ) : (
             <p className="text-sm text-gray-400 italic">No cohort assigned yet.</p>
@@ -82,7 +88,6 @@ function InternDashboard() {
         </div>
       </div>
 
-      {/* Next meeting */}
       {nextMeeting && (
         <div className="bg-purple-50 border border-purple-200 rounded-2xl p-5">
           <p className="text-xs text-purple-600 font-medium uppercase tracking-wider mb-2">Next Meeting</p>
@@ -91,7 +96,7 @@ function InternDashboard() {
               <p className="font-bold text-gray-800">{nextMeeting.title}</p>
               <p className="text-sm text-gray-600 mt-0.5">
                 {fmtDateTime(nextMeeting.scheduledAt)}
-                {nextMeeting.duration ? ` · ${nextMeeting.duration} min` : ''}
+                {nextMeeting.duration ? ` · ${nextMeeting.duration} min` : ""}
               </p>
               <p className="text-xs text-gray-500 mt-0.5">by {nextMeeting.mentor?.name}</p>
             </div>
@@ -102,7 +107,6 @@ function InternDashboard() {
         </div>
       )}
 
-      {/* Assignment stats */}
       <div>
         <p className="text-sm font-medium text-gray-600 mb-2">Assignments</p>
         <div className="grid grid-cols-3 gap-3">
@@ -121,7 +125,6 @@ function InternDashboard() {
         </div>
       </div>
 
-      {/* Task stats */}
       <div>
         <p className="text-sm font-medium text-gray-600 mb-2">Tasks</p>
         <div className="grid grid-cols-2 gap-3">

@@ -1,16 +1,56 @@
-﻿import { Outlet, Link, useNavigate } from 'react-router-dom';
+﻿import { useState } from 'react';
+import { Outlet, Link, useNavigate } from 'react-router-dom';
 import useAuthStore from '../store/authStore';
 import NotificationBell from '../components/NotificationBell';
+
+function LogoutModal({ onConfirm, onCancel }) {
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-40 z-50 flex items-center justify-center">
+      <div className="bg-white rounded-2xl shadow-xl p-6 w-80 mx-4">
+        <div className="text-center">
+          <div className="text-4xl mb-3">👋</div>
+          <h3 className="text-lg font-bold text-gray-800 mb-2">Logging out?</h3>
+          <p className="text-sm text-gray-500 mb-6">You'll need to sign in again to access your dashboard.</p>
+        </div>
+        <div className="flex gap-3">
+          <button
+            onClick={onCancel}
+            className="flex-1 px-4 py-2 rounded-xl border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50 transition"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="flex-1 px-4 py-2 rounded-xl bg-red-500 text-white text-sm font-medium hover:bg-red-600 transition"
+          >
+            Yes, Logout
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function MentorLayout() {
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
   const navigate = useNavigate();
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
-  const handleLogout = () => { logout(); navigate('/login'); };
+  const handleLogoutConfirm = () => {
+    setShowLogoutModal(false);
+    logout();
+    navigate('/login', { replace: true });
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {showLogoutModal && (
+        <LogoutModal
+          onConfirm={handleLogoutConfirm}
+          onCancel={() => setShowLogoutModal(false)}
+        />
+      )}
       <header className="bg-white shadow-sm">
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -18,22 +58,32 @@ function MentorLayout() {
             <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">MENTOR</span>
           </div>
           <nav className="flex items-center gap-3 flex-wrap">
-            <Link to="/mentor" className="text-sm text-gray-600 hover:text-purple-600">Dashboard</Link>
-            <Link to="/mentor/interns" className="text-sm text-gray-600 hover:text-purple-600">Interns</Link>
-            <Link to="/mentor/assignments" className="text-sm text-gray-600 hover:text-purple-600">Assignments</Link>
-            <Link to="/mentor/tasks" className="text-sm text-gray-600 hover:text-purple-600">Tasks</Link>
-            <Link to="/mentor/meetings" className="text-sm text-gray-600 hover:text-purple-600">Meetings</Link>
-            <Link to="/mentor/notes" className="text-sm text-gray-600 hover:text-purple-600">Notes</Link>
-            <Link to="/mentor/sprint" className="text-sm text-gray-600 hover:text-purple-600 font-medium">🏃 Sprint</Link>
+            <Link to="/mentor" className="text-sm text-gray-600 hover:text-purple-600 transition">Dashboard</Link>
+            <Link to="/mentor/interns" className="text-sm text-gray-600 hover:text-purple-600 transition">Interns</Link>
+            <Link to="/mentor/assignments" className="text-sm text-gray-600 hover:text-purple-600 transition">Assignments</Link>
+            <Link to="/mentor/tasks" className="text-sm text-gray-600 hover:text-purple-600 transition">Tasks</Link>
+            <Link to="/mentor/meetings" className="text-sm text-gray-600 hover:text-purple-600 transition">Meetings</Link>
+            <Link to="/mentor/notes" className="text-sm text-gray-600 hover:text-purple-600 transition">Notes</Link>
+            <Link to="/mentor/sprint" className="text-sm text-gray-600 hover:text-purple-600 font-medium transition">🏃 Sprint</Link>
+            <Link to="/mentor/standup" className="text-sm text-gray-600 hover:text-purple-600 transition">Standup</Link>
+            <Link to="/mentor/polls" className="text-sm text-gray-600 hover:text-purple-600 transition">Polls</Link>
+            <Link to="/mentor/announcements" className="text-sm text-gray-600 hover:text-purple-600 transition">📢 Announce</Link>
           </nav>
           <div className="flex items-center gap-3">
             <NotificationBell />
             <span className="text-sm text-gray-600">{user?.name}</span>
-            <button onClick={handleLogout} className="text-sm bg-gray-100 text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-200 transition">Logout</button>
+            <button
+              onClick={() => setShowLogoutModal(true)}
+              className="text-sm bg-red-500 text-white px-3 py-1.5 rounded-lg hover:bg-red-600 active:bg-red-700 transition font-medium"
+            >
+              Logout
+            </button>
           </div>
         </div>
       </header>
-      <main className="max-w-6xl mx-auto px-4 py-8"><Outlet /></main>
+      <main className="max-w-6xl mx-auto px-4 py-8">
+        <Outlet />
+      </main>
     </div>
   );
 }
