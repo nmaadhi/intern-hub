@@ -38,6 +38,8 @@ app.use('/api/sprint', require('./routes/sprint'));
 app.use('/api/standup', require('./routes/standup'));
 app.use('/api/poll', require('./routes/poll'));
 app.use('/api/announcement', require('./routes/announcement'));
+app.use('/api/chat', require('./routes/chat'));
+app.use('/api/quiz', require('./routes/quiz'));
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Route not found', path: req.originalUrl });
@@ -52,9 +54,16 @@ app.use((err, req, res, next) => {
 io.on('connection', (socket) => {
   console.log(`🔌 Socket connected: ${socket.id}`);
 
+  // Join cohort room for broadcasts
   socket.on('join:cohort', (cohortId) => {
     socket.join(`cohort:${cohortId}`);
     console.log(`   ↳ joined room cohort:${cohortId}`);
+  });
+
+  // Join personal room for direct messages
+  socket.on('join:user', (userId) => {
+    socket.join(`user:${userId}`);
+    console.log(`   ↳ joined room user:${userId}`);
   });
 
   socket.on('user:online', ({ userId, cohortId }) => {
@@ -74,9 +83,7 @@ io.on('connection', (socket) => {
   });
 });
 
-// ── Neon keepalive — ping every 4 min to prevent DB sleep ─────────
-// Neon free tier sleeps after 5 minutes of inactivity.
-// This ping keeps it awake so users don't hit cold-start delays.
+// ── Neon keepalive ─────────────────────────────────────────────────
 setInterval(async () => {
   try {
     await prisma.$queryRaw`SELECT 1`;
@@ -86,7 +93,7 @@ setInterval(async () => {
   }
 }, 4 * 60 * 1000);
 
-// ── Global error handlers — prevent server crash from Neon sleep ──
+// ── Global error handlers ──────────────────────────────────────────
 process.on('unhandledRejection', (reason) => {
   const msg = reason?.message || String(reason);
   if (msg.includes('P1001') || msg.includes('database') || msg.includes('ECONNREFUSED')) {
@@ -105,7 +112,7 @@ process.on('uncaughtException', (err) => {
   process.exit(1);
 });
 
-// ── Start ─────────────────────────────────────────────────────────
+// ── Start ──────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
   console.log(`✅ Server running on http://localhost:${PORT}`);

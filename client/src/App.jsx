@@ -12,6 +12,7 @@ const NotFound = lazy(() => import('./pages/NotFound'));
 const ChangePassword = lazy(() => import('./pages/ChangePassword'));
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
+const Chat = lazy(() => import('./pages/Chat'));
 
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
 const ManageMentors = lazy(() => import('./pages/admin/ManageMentors'));
@@ -30,6 +31,7 @@ const SprintBoard = lazy(() => import('./pages/mentor/SprintBoard'));
 const StandupFeed = lazy(() => import('./pages/mentor/StandupFeed'));
 const Polls = lazy(() => import('./pages/mentor/Polls'));
 const Announcements = lazy(() => import('./pages/mentor/Announcements'));
+const MentorQuiz = lazy(() => import('./pages/mentor/Quiz'));
 
 const InternDashboard = lazy(() => import('./pages/intern/InternDashboard'));
 const Profile = lazy(() => import('./pages/intern/Profile'));
@@ -42,6 +44,8 @@ const InternSprintBoard = lazy(() => import('./pages/intern/SprintBoard'));
 const Standup = lazy(() => import('./pages/intern/Standup'));
 const ActivePoll = lazy(() => import('./pages/intern/ActivePoll'));
 const InternAnnouncements = lazy(() => import('./pages/intern/Announcements'));
+const Quizzes = lazy(() => import('./pages/intern/Quizzes'));
+const TakeQuiz = lazy(() => import('./pages/intern/TakeQuiz'));
 
 function PageLoader() {
   return (
@@ -74,6 +78,7 @@ function App() {
             <Route path="cohorts" element={<ManageCohorts />} />
             <Route path="interns" element={<ManageInterns />} />
             <Route path="sprints" element={<ManageSprints />} />
+            <Route path="chat" element={<Chat />} />
           </Route>
         </Route>
 
@@ -90,6 +95,8 @@ function App() {
             <Route path="standup" element={<StandupFeed />} />
             <Route path="polls" element={<Polls />} />
             <Route path="announcements" element={<Announcements />} />
+            <Route path="quiz" element={<MentorQuiz />} />
+            <Route path="chat" element={<Chat />} />
           </Route>
         </Route>
 
@@ -106,6 +113,9 @@ function App() {
             <Route path="standup" element={<Standup />} />
             <Route path="polls" element={<ActivePoll />} />
             <Route path="announcements" element={<InternAnnouncements />} />
+            <Route path="quizzes" element={<Quizzes />} />
+            <Route path="quizzes/:id" element={<TakeQuiz />} />
+            <Route path="chat" element={<Chat />} />
           </Route>
         </Route>
 

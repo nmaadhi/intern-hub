@@ -1,54 +1,59 @@
-import { io } from 'socket.io-client';
+﻿import { io } from "socket.io-client";
 
-const SOCKET_URL = import.meta.env.VITE_API_URL
-  ? import.meta.env.VITE_API_URL.replace('/api', '')
-  : 'http://localhost:5000';
+const URL = import.meta.env.VITE_API_URL?.replace("/api", "") || "http://localhost:5000";
 
-export const socket = io(SOCKET_URL, {
-  autoConnect: false,
-  withCredentials: true,
+export const socket = io(URL, {
+  autoConnect: true,
   reconnection: true,
-  reconnectionAttempts: Infinity,
-  reconnectionDelay: 2000,
-  reconnectionDelayMax: 10000,
-  timeout: 20000,
+  reconnectionAttempts: 10,
+  reconnectionDelay: 1000,
+  reconnectionDelayMax: 5000,
 });
 
-// Log reconnection events so we know what's happening
-socket.on('reconnect_attempt', (n) => {
-  console.log(`🔄 Socket reconnecting... attempt ${n}`);
-});
+export function joinUserRoom(userId) {
+  socket.emit("join:user", userId);
+}
 
-socket.on('reconnect', () => {
-  console.log('✅ Socket reconnected');
-  // Re-join cohort room after reconnect
-  const cohortId = socket.data?.cohortId;
-  if (cohortId) {
-    socket.emit('join:cohort', cohortId);
-  }
-});
+export function joinCohortRoom(cohortId) {
+  socket.emit("join:cohort", cohortId);
+}
 
-socket.on('disconnect', (reason) => {
-  console.log(`🔌 Socket disconnected: ${reason}`);
-  if (reason === 'io server disconnect') {
-    // Server forced disconnect — reconnect manually
-    socket.connect();
-  }
-});
-
+// Called on login — joins user + cohort rooms
 export function connectSocket({ userId, cohortId }) {
-  if (!socket.connected) {
-    socket.connect();
+  if (userId) {
+    socket.emit("join:user", userId);
+    sessionStorage.setItem("userId", userId);
   }
-  socket.data = { userId, cohortId };
-  socket.emit('user:online', { userId, cohortId });
   if (cohortId) {
-    socket.emit('join:cohort', cohortId);
+    socket.emit("join:cohort", cohortId);
+    sessionStorage.setItem("cohortId", cohortId);
   }
 }
 
+// Called on logout — clears rooms
 export function disconnectSocket() {
-  if (socket.connected) {
-    socket.disconnect();
-  }
+  sessionStorage.removeItem("userId");
+  sessionStorage.removeItem("cohortId");
+  socket.disconnect();
+  socket.connect();
 }
+
+socket.on("connect", () => {
+  console.log("Socket connected:", socket.id);
+  const userId = sessionStorage.getItem("userId");
+  const cohortId = sessionStorage.getItem("cohortId");
+  if (userId) socket.emit("join:user", userId);
+  if (cohortId) socket.emit("join:cohort", cohortId);
+});
+
+socket.on("disconnect", (reason) => {
+  console.log("Socket disconnected:", reason);
+});
+
+socket.on("reconnect", (attempt) => {
+  console.log("Socket reconnected after", attempt, "attempts");
+  const userId = sessionStorage.getItem("userId");
+  const cohortId = sessionStorage.getItem("cohortId");
+  if (userId) socket.emit("join:user", userId);
+  if (cohortId) socket.emit("join:cohort", cohortId);
+});

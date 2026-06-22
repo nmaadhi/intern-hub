@@ -43,14 +43,15 @@ export default function NotificationBell() {
   };
 
   const typeIcon = (type) => {
-    switch (type) {
-      case 'TASK_ASSIGNED': return '📋';
-      case 'TASK_BLOCKED': return '🚫';
-      case 'SPRINT_PHASE': return '🏃';
-      case 'ANNOUNCEMENT': return '📢';
-      default: return '🔔';
-    }
-  };
+  switch (type) {
+    case 'TASK_ASSIGNED': return '📋';
+    case 'TASK_BLOCKED': return '🚫';
+    case 'SPRINT_PHASE': return '🏃';
+    case 'ANNOUNCEMENT': return '📢';
+    case 'CHAT': return '💬';
+    default: return '🔔';
+  }
+};
 
   return (
     <div className="relative">

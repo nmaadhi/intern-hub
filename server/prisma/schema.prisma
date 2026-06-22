@@ -50,14 +50,21 @@ model User {
   createdNotes   Note[]          @relation("MentorNotes")
   noteRecipients NoteRecipient[] @relation("NoteRecipientIntern")
 
-  createdSprints       Sprint[]       @relation("MentorSprints")
-  createdSprintTasks   SprintTask[]   @relation("MentorSprintTasks")
-  assignedSprintTasks  SprintTask[]   @relation("InternSprintTasks")
+  createdSprints      Sprint[]     @relation("MentorSprints")
+  createdSprintTasks  SprintTask[] @relation("MentorSprintTasks")
+  assignedSprintTasks SprintTask[] @relation("InternSprintTasks")
 
-  standups             Standup[]      @relation("InternStandups")
-  createdPolls         Poll[]         @relation("MentorPolls")
-  pollResponses        PollResponse[] @relation("InternPollResponses")
-  createdAnnouncements Announcement[] @relation("MentorAnnouncements")
+  standups             Standup[]       @relation("InternStandups")
+  createdPolls         Poll[]          @relation("MentorPolls")
+  pollResponses        PollResponse[]  @relation("InternPollResponses")
+  createdAnnouncements Announcement[]  @relation("MentorAnnouncements")
+
+  sentMessages     Message[] @relation("SentMessages")
+  receivedMessages Message[] @relation("ReceivedMessages")
+
+  createdQuizzes Quiz[]          @relation("MentorQuizzes")
+  quizAttempts   QuizAttempt[]   @relation("InternQuizAttempts")
+  quizRecipients QuizRecipient[] @relation("InternQuizRecipients")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -81,6 +88,7 @@ model Cohort {
   sprints       Sprint[]
   polls         Poll[]
   announcements Announcement[]
+  quizzes       Quiz[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -409,4 +417,103 @@ model Announcement {
 
   @@index([cohortId])
   @@index([createdAt])
+}
+
+model Message {
+  id        String  @id @default(cuid())
+  content   String
+  delivered Boolean @default(false)
+  read      Boolean @default(false)
+
+  senderId String
+  sender   User   @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+
+  receiverId String
+  receiver   User   @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([senderId])
+  @@index([receiverId])
+  @@index([senderId, receiverId])
+}
+
+model Quiz {
+  id         String @id @default(cuid())
+  topic      String
+  status     String @default("ACTIVE")
+  assignType String @default("COHORT")
+
+  cohortId String
+  cohort   Cohort @relation(fields: [cohortId], references: [id], onDelete: Cascade)
+
+  createdById String
+  createdBy   User   @relation("MentorQuizzes", fields: [createdById], references: [id])
+
+  questions  QuizQuestion[]
+  attempts   QuizAttempt[]
+  recipients QuizRecipient[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([cohortId])
+}
+
+model QuizQuestion {
+  id       String @id @default(cuid())
+  question String
+  order    Int    @default(0)
+
+  quizId String
+  quiz   Quiz   @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  options QuizOption[]
+
+  @@index([quizId])
+}
+
+model QuizOption {
+  id        String  @id @default(cuid())
+  text      String
+  isCorrect Boolean @default(false)
+  order     Int     @default(0)
+
+  questionId String
+  question   QuizQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@index([questionId])
+}
+
+model QuizAttempt {
+  id      String @id @default(cuid())
+  answers Json
+  score   Int
+  total   Int
+
+  quizId String
+  quiz   Quiz   @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  internId String
+  intern   User   @relation("InternQuizAttempts", fields: [internId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([quizId, internId])
+  @@index([quizId])
+  @@index([internId])
+}
+
+model QuizRecipient {
+  id       String @id @default(cuid())
+  quizId   String
+  quiz     Quiz   @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  internId String
+  intern   User   @relation("InternQuizRecipients", fields: [internId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([quizId, internId])
+  @@index([quizId])
+  @@index([internId])
 }

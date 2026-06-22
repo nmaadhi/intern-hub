@@ -1,7 +1,7 @@
-﻿import { useState } from 'react';
-import { Outlet, Link, useNavigate } from 'react-router-dom';
-import useAuthStore from '../store/authStore';
-import NotificationBell from '../components/NotificationBell';
+﻿import { useState } from "react";
+import { Outlet, Link, useNavigate } from "react-router-dom";
+import useAuthStore from "../store/authStore";
+import NotificationBell from "../components/NotificationBell";
 
 function LogoutModal({ onConfirm, onCancel }) {
   return (
@@ -10,15 +10,11 @@ function LogoutModal({ onConfirm, onCancel }) {
         <div className="text-center">
           <div className="text-4xl mb-3">👋</div>
           <h3 className="text-lg font-bold text-gray-800 mb-2">Logging out?</h3>
-          <p className="text-sm text-gray-500 mb-6">You'll need to sign in again to access your dashboard.</p>
+          <p className="text-sm text-gray-500 mb-6">You will need to sign in again to access your dashboard.</p>
         </div>
         <div className="flex gap-3">
-          <button onClick={onCancel} className="flex-1 px-4 py-2 rounded-xl border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50 transition">
-            Cancel
-          </button>
-          <button onClick={onConfirm} className="flex-1 px-4 py-2 rounded-xl bg-red-500 text-white text-sm font-medium hover:bg-red-600 transition">
-            Yes, Logout
-          </button>
+          <button onClick={onCancel} className="flex-1 px-4 py-2 rounded-xl border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50 transition">Cancel</button>
+          <button onClick={onConfirm} className="flex-1 px-4 py-2 rounded-xl bg-red-500 text-white text-sm font-medium hover:bg-red-600 transition">Yes, Logout</button>
         </div>
       </div>
     </div>
@@ -34,16 +30,13 @@ function AdminLayout() {
   const handleLogoutConfirm = () => {
     setShowLogoutModal(false);
     logout();
-    navigate('/login', { replace: true });
+    navigate("/login", { replace: true });
   };
 
   return (
     <div className="min-h-screen bg-gray-50">
       {showLogoutModal && (
-        <LogoutModal
-          onConfirm={handleLogoutConfirm}
-          onCancel={() => setShowLogoutModal(false)}
-        />
+        <LogoutModal onConfirm={handleLogoutConfirm} onCancel={() => setShowLogoutModal(false)} />
       )}
       <header className="bg-white shadow-sm">
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
@@ -57,19 +50,15 @@ function AdminLayout() {
             <Link to="/admin/cohorts" className="text-sm text-gray-600 hover:text-blue-600 transition">Cohorts</Link>
             <Link to="/admin/interns" className="text-sm text-gray-600 hover:text-blue-600 transition">Interns</Link>
             <Link to="/admin/sprints" className="text-sm text-gray-600 hover:text-blue-600 font-medium transition">🏃 Sprints</Link>
+            <Link to="/admin/chat" className="text-sm text-gray-600 hover:text-blue-600 transition">💬 Chat</Link>
           </nav>
           <div className="flex items-center gap-3">
             <NotificationBell />
             <div className="flex flex-col items-end">
               <span className="text-sm text-gray-600">{user?.name}</span>
-              <Link to="/change-password" className="text-xs text-gray-400 hover:text-blue-600 transition">
-                Change Password
-              </Link>
+              <Link to="/change-password" className="text-xs text-gray-400 hover:text-blue-600 transition">Change Password</Link>
             </div>
-            <button
-              onClick={() => setShowLogoutModal(true)}
-              className="text-sm bg-red-500 text-white px-3 py-1.5 rounded-lg hover:bg-red-600 active:bg-red-700 transition font-medium"
-            >
+            <button onClick={() => setShowLogoutModal(true)} className="text-sm bg-red-500 text-white px-3 py-1.5 rounded-lg hover:bg-red-600 active:bg-red-700 transition font-medium">
               Logout
             </button>
           </div>
