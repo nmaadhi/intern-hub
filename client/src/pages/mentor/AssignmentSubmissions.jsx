@@ -8,7 +8,6 @@ function getPreviewUrl(fileUrl, fileName) {
   if (officeFormats.includes(ext)) {
     return `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(fileUrl)}`;
   }
-  // PDF, md, txt, ipynb — browser handles directly
   return fileUrl;
 }
 
@@ -20,9 +19,7 @@ function FilePreview({ fileUrl, fileName }) {
     ppt: 'text-orange-500', pptx: 'text-orange-500',
     xls: 'text-green-500', xlsx: 'text-green-500',
   };
-
   const previewUrl = getPreviewUrl(fileUrl, fileName);
-
   return (
     <div className="bg-gray-50 rounded-lg p-3">
       <p className="text-xs text-gray-400 mb-2 font-medium uppercase tracking-wider">Submitted File</p>
@@ -32,17 +29,10 @@ function FilePreview({ fileUrl, fileName }) {
         </span>
         <span className="text-sm text-gray-700 flex-1 truncate">{fileName || 'Uploaded file'}</span>
         <div className="flex gap-2 shrink-0">
-          <a href={previewUrl} target="_blank" rel="noreferrer" className="text-xs bg-purple-600 text-white px-3 py-1.5 rounded-lg hover:bg-purple-700 transition font-medium">
-            Preview
-          </a>
-          <a href={fileUrl} target="_blank" rel="noreferrer" className="text-xs bg-gray-600 text-white px-3 py-1.5 rounded-lg hover:bg-gray-700 transition font-medium">
-            Download
-          </a>
+          <a href={previewUrl} target="_blank" rel="noreferrer" className="text-xs bg-purple-600 text-white px-3 py-1.5 rounded-lg hover:bg-purple-700 transition font-medium">Preview</a>
+          <a href={fileUrl} target="_blank" rel="noreferrer" className="text-xs bg-gray-600 text-white px-3 py-1.5 rounded-lg hover:bg-gray-700 transition font-medium">Download</a>
         </div>
       </div>
-      {['doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx'].includes(ext) && (
-        <p className="text-xs text-gray-400 mt-2">Opens in Microsoft Office Online Viewer.</p>
-      )}
     </div>
   );
 }
@@ -53,9 +43,9 @@ function AssignmentSubmissions() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-
   const [feedbackDrafts, setFeedbackDrafts] = useState({});
   const [actionLoadingId, setActionLoadingId] = useState(null);
+  const [aiFeedbackLoadingId, setAiFeedbackLoadingId] = useState(null);
 
   const load = async () => {
     setLoading(true);
@@ -86,6 +76,18 @@ function AssignmentSubmissions() {
     }
   };
 
+  const handleAIFeedback = async (submissionId) => {
+    setAiFeedbackLoadingId(submissionId);
+    try {
+      const res = await api.post(`/mentor/submissions/${submissionId}/ai-feedback`);
+      setFeedbackDrafts((prev) => ({ ...prev, [submissionId]: res.data.aiFeedback }));
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to generate AI feedback');
+    } finally {
+      setAiFeedbackLoadingId(null);
+    }
+  };
+
   const fmtDate = (s) => s ? new Date(s).toLocaleString() : '';
 
   if (loading) return <div className="bg-white rounded-2xl shadow-sm p-8 text-center text-gray-500">Loading...</div>;
@@ -97,12 +99,20 @@ function AssignmentSubmissions() {
   return (
     <div className="space-y-6">
       <div>
-        <Link to="/mentor/assignments" className="text-sm text-purple-600 hover:underline">← Back to Assignments</Link>
+        <Link to="/mentor/assignments" className="text-sm text-purple-600 hover:underline">
+          ← Back to Assignments
+        </Link>
         <div className="flex items-start justify-between mt-2">
           <div>
             <h2 className="text-2xl font-bold text-gray-800">{assignment?.title}</h2>
-            {assignment?.description && (<p className="text-gray-600 text-sm mt-1">{assignment.description}</p>)}
-            {assignment?.dueDate && (<p className="text-xs text-gray-500 mt-1">Due {new Date(assignment.dueDate).toLocaleDateString()}</p>)}
+            {assignment?.description && (
+              <p className="text-gray-600 text-sm mt-1">{assignment.description}</p>
+            )}
+            {assignment?.dueDate && (
+              <p className="text-xs text-gray-500 mt-1">
+                Due {new Date(assignment.dueDate).toLocaleDateString()}
+              </p>
+            )}
           </div>
           <div className="flex gap-3 text-sm shrink-0 ml-4">
             <span className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full">{submittedCount} submitted</span>
@@ -148,17 +158,17 @@ function AssignmentSubmissions() {
                   {sub.linkUrl && (
                     <div className="bg-gray-50 rounded-lg p-3">
                       <p className="text-xs text-gray-400 mb-1 font-medium uppercase tracking-wider">Link</p>
-                      <a href={sub.linkUrl} target="_blank" rel="noreferrer" className="text-sm text-blue-600 hover:underline break-all">{sub.linkUrl}</a>
+                      <a href={sub.linkUrl} target="_blank" rel="noreferrer" className="text-sm text-blue-600 hover:underline break-all">
+                        {sub.linkUrl}
+                      </a>
                     </div>
                   )}
 
-                  {sub.fileUrl && (
-                    <FilePreview fileUrl={sub.fileUrl} fileName={sub.fileName} />
-                  )}
+                  {sub.fileUrl && <FilePreview fileUrl={sub.fileUrl} fileName={sub.fileName} />}
 
                   <p className="text-xs text-gray-400">Submitted {fmtDate(sub.submittedAt)}</p>
 
-                  {sub.feedback && (
+                  {sub.feedback && sub.status === 'APPROVED' && (
                     <div className="bg-purple-50 rounded-lg p-3 text-sm text-purple-800">
                       <span className="font-medium">Your feedback: </span>{sub.feedback}
                     </div>
@@ -166,18 +176,53 @@ function AssignmentSubmissions() {
 
                   {needsAction && (
                     <div className="pt-2 space-y-2 border-t border-gray-100">
+
+                      {/* AI Feedback button */}
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-medium text-gray-600">Feedback</p>
+                        <button
+                          onClick={() => handleAIFeedback(sub.id)}
+                          disabled={aiFeedbackLoadingId === sub.id}
+                          className="flex items-center gap-1.5 text-xs bg-purple-100 text-purple-700 px-3 py-1.5 rounded-lg hover:bg-purple-200 disabled:opacity-50 transition font-medium"
+                        >
+                          {aiFeedbackLoadingId === sub.id ? (
+                            <>
+                              <div className="w-3 h-3 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+                              Generating...
+                            </>
+                          ) : (
+                            <>✨ Generate AI Feedback</>
+                          )}
+                        </button>
+                      </div>
+
                       <textarea
                         value={feedbackDrafts[sub.id] ?? sub.feedback ?? ''}
                         onChange={(e) => setFeedbackDrafts((prev) => ({ ...prev, [sub.id]: e.target.value }))}
-                        rows={2}
-                        placeholder="Add feedback (optional for approve, recommended for revision)"
+                        rows={3}
+                        placeholder="Add feedback (optional for approve, recommended for revision) — or click Generate AI Feedback above"
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
                       />
+
+                      {feedbackDrafts[sub.id] && (
+                        <p className="text-xs text-purple-600">
+                          ✨ AI feedback drafted — edit if needed, then approve or request revision
+                        </p>
+                      )}
+
                       <div className="flex gap-2">
-                        <button onClick={() => handleReview(sub.id, 'APPROVED')} disabled={actionLoadingId === sub.id} className="bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-sm hover:bg-emerald-700 disabled:opacity-50 transition font-medium">
+                        <button
+                          onClick={() => handleReview(sub.id, 'APPROVED')}
+                          disabled={actionLoadingId === sub.id}
+                          className="bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-sm hover:bg-emerald-700 disabled:opacity-50 transition font-medium"
+                        >
                           ✓ Approve
                         </button>
-                        <button onClick={() => handleReview(sub.id, 'NEEDS_REVISION')} disabled={actionLoadingId === sub.id} className="bg-amber-500 text-white px-3 py-1.5 rounded-lg text-sm hover:bg-amber-600 disabled:opacity-50 transition font-medium">
+                        <button
+                          onClick={() => handleReview(sub.id, 'NEEDS_REVISION')}
+                          disabled={actionLoadingId === sub.id}
+                          className="bg-amber-500 text-white px-3 py-1.5 rounded-lg text-sm hover:bg-amber-600 disabled:opacity-50 transition font-medium"
+                        >
                           ↩ Request Revision
                         </button>
                       </div>
@@ -185,7 +230,9 @@ function AssignmentSubmissions() {
                   )}
 
                   {sub.status === 'APPROVED' && (
-                    <p className="text-xs text-emerald-600 font-medium">✓ Approved {sub.reviewedAt ? `on ${fmtDate(sub.reviewedAt)}` : ''}</p>
+                    <p className="text-xs text-emerald-600 font-medium">
+                      ✓ Approved {sub.reviewedAt ? `on ${fmtDate(sub.reviewedAt)}` : ''}
+                    </p>
                   )}
                 </div>
               )}

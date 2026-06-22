@@ -4,6 +4,13 @@ const router = express.Router();
 
 const prisma = require('../prisma');
 const { verifyToken, requireRole } = require('../middleware/auth');
+const Groq = require('groq-sdk');
+
+let groq = null;
+function getGroq() {
+  if (!groq) groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+  return groq;
+}
 
 router.use(verifyToken);
 router.use(requireRole('MENTOR'));
@@ -222,6 +229,66 @@ router.patch('/submissions/:id', async (req, res) => {
   }
 });
 
+// ── POST /mentor/submissions/:id/ai-feedback ──────────────────────
+// AI generates draft feedback for mentor to review and edit
+router.post('/submissions/:id/ai-feedback', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const submission = await prisma.submission.findUnique({
+      where: { id },
+      include: {
+        assignment: { include: { cohort: true } },
+        intern: { select: { name: true } },
+      },
+    });
+
+    if (!submission) return res.status(404).json({ error: 'Submission not found' });
+
+    // Build context for AI
+    const assignmentTitle = submission.assignment.title;
+    const assignmentDesc = submission.assignment.description || 'No description provided';
+    const internName = submission.intern.name;
+    const submissionContent = submission.content || 'No text content';
+    const submissionLink = submission.linkUrl ? `Link: ${submission.linkUrl}` : '';
+    const submissionFile = submission.fileName ? `File: ${submission.fileName}` : '';
+
+    const prompt = `You are a helpful mentor reviewing an intern's assignment submission.
+
+Assignment: "${assignmentTitle}"
+Description: ${assignmentDesc}
+
+Intern: ${internName}
+Submission:
+${submissionContent}
+${submissionLink}
+${submissionFile}
+
+Write constructive, encouraging feedback for this intern. The feedback should:
+- Start with something positive about their work
+- Point out 2-3 specific things they did well
+- Suggest 1-2 areas for improvement with clear guidance
+- End with encouragement
+- Be 3-5 sentences total
+- Be written directly to the intern (use "you" not "the intern")
+- Sound human and warm, not robotic
+
+Write ONLY the feedback text, nothing else.`;
+
+    const response = await getGroq().chat.completions.create({
+      model: 'llama-3.3-70b-versatile',
+      max_tokens: 500,
+      messages: [{ role: 'user', content: prompt }],
+    });
+
+    const aiFeedback = response.choices[0].message.content.trim();
+    res.json({ aiFeedback });
+  } catch (err) {
+    console.error('💥 Error generating AI feedback:', err);
+    res.status(500).json({ error: 'Failed to generate AI feedback: ' + err.message });
+  }
+});
+
 // ════════════════════════════════════════════════════════════════════
 // TASKS
 // ════════════════════════════════════════════════════════════════════
@@ -427,55 +494,34 @@ router.delete('/meetings/:id', async (req, res) => {
 });
 
 // ════════════════════════════════════════════════════════════════════
-// NOTES — share content/files with cohort or specific interns
+// NOTES
 // ════════════════════════════════════════════════════════════════════
 
-// POST /notes — create a note
 router.post('/notes', async (req, res) => {
   try {
     const { title, content, fileUrl, fileName, cohortId, internIds } = req.body;
-
-    if (!title) {
-      return res.status(400).json({ error: 'Title is required' });
-    }
-    if (!content && !fileUrl) {
-      return res.status(400).json({ error: 'Provide text content, a file, or both' });
-    }
+    if (!title) return res.status(400).json({ error: 'Title is required' });
+    if (!content && !fileUrl) return res.status(400).json({ error: 'Provide text content, a file, or both' });
     if (!cohortId && (!internIds || internIds.length === 0)) {
       return res.status(400).json({ error: 'Provide either a cohortId or internIds' });
     }
     if (cohortId && internIds && internIds.length > 0) {
       return res.status(400).json({ error: 'Provide either cohortId or internIds, not both' });
     }
-
     const trimmedTitle = title.trim();
     if (trimmedTitle.length < 2 || trimmedTitle.length > 150) {
       return res.status(400).json({ error: 'Title must be 2 to 150 characters' });
     }
-
     if (cohortId) {
       const cohort = await prisma.cohort.findUnique({ where: { id: cohortId } });
       if (!cohort) return res.status(404).json({ error: 'Cohort not found' });
-      if (cohort.mentorId !== req.user.userId) {
-        return res.status(403).json({ error: 'You do not lead this cohort' });
-      }
-
+      if (cohort.mentorId !== req.user.userId) return res.status(403).json({ error: 'You do not lead this cohort' });
       const note = await prisma.note.create({
-        data: {
-          title: trimmedTitle,
-          content: content?.trim() || null,
-          fileUrl: fileUrl || null,
-          fileName: fileName || null,
-          cohortId,
-          createdById: req.user.userId,
-        },
+        data: { title: trimmedTitle, content: content?.trim() || null, fileUrl: fileUrl || null, fileName: fileName || null, cohortId, createdById: req.user.userId },
         include: { cohort: { select: { id: true, name: true } } },
       });
-
       return res.status(201).json({ message: 'Note shared with cohort', note: { ...note, type: 'COHORT' } });
     }
-
-    // Direct — validate interns
     const interns = await prisma.user.findMany({
       where: { id: { in: internIds }, role: 'INTERN', mentorId: req.user.userId },
       select: { id: true },
@@ -483,35 +529,20 @@ router.post('/notes', async (req, res) => {
     if (interns.length !== internIds.length) {
       return res.status(403).json({ error: 'One or more interns are not directly assigned to you' });
     }
-
     const note = await prisma.$transaction(async (tx) => {
       const n = await tx.note.create({
-        data: {
-          title: trimmedTitle,
-          content: content?.trim() || null,
-          fileUrl: fileUrl || null,
-          fileName: fileName || null,
-          cohortId: null,
-          createdById: req.user.userId,
-        },
+        data: { title: trimmedTitle, content: content?.trim() || null, fileUrl: fileUrl || null, fileName: fileName || null, cohortId: null, createdById: req.user.userId },
       });
-      await tx.noteRecipient.createMany({
-        data: internIds.map((internId) => ({ noteId: n.id, internId })),
-      });
+      await tx.noteRecipient.createMany({ data: internIds.map((internId) => ({ noteId: n.id, internId })) });
       return n;
     });
-
-    res.status(201).json({
-      message: 'Note shared with selected interns',
-      note: { ...note, type: 'DIRECT', recipientCount: internIds.length },
-    });
+    res.status(201).json({ message: 'Note shared with selected interns', note: { ...note, type: 'DIRECT', recipientCount: internIds.length } });
   } catch (err) {
     console.error('💥 Error creating note:', err);
     res.status(500).json({ error: 'Failed to create note' });
   }
 });
 
-// GET /notes — list all notes I created
 router.get('/notes', async (req, res) => {
   try {
     const notes = await prisma.note.findMany({
@@ -522,19 +553,12 @@ router.get('/notes', async (req, res) => {
         recipients: { include: { intern: { select: { id: true, name: true, internId: true } } } },
       },
     });
-
     const formatted = notes.map((n) => ({
-      id: n.id,
-      title: n.title,
-      content: n.content,
-      fileUrl: n.fileUrl,
-      fileName: n.fileName,
-      createdAt: n.createdAt,
-      type: n.cohortId ? 'COHORT' : 'DIRECT',
+      id: n.id, title: n.title, content: n.content, fileUrl: n.fileUrl, fileName: n.fileName,
+      createdAt: n.createdAt, type: n.cohortId ? 'COHORT' : 'DIRECT',
       cohort: n.cohort || null,
       recipients: n.cohortId ? [] : n.recipients.map((r) => r.intern),
     }));
-
     res.json({ count: formatted.length, notes: formatted });
   } catch (err) {
     console.error('💥 Error listing notes:', err);
@@ -542,20 +566,94 @@ router.get('/notes', async (req, res) => {
   }
 });
 
-// DELETE /notes/:id — remove a note
 router.delete('/notes/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const note = await prisma.note.findUnique({ where: { id } });
     if (!note) return res.status(404).json({ error: 'Note not found' });
-    if (note.createdById !== req.user.userId) {
-      return res.status(403).json({ error: 'You did not create this note' });
-    }
+    if (note.createdById !== req.user.userId) return res.status(403).json({ error: 'You did not create this note' });
     await prisma.note.delete({ where: { id } });
     res.json({ message: 'Note deleted successfully' });
   } catch (err) {
     console.error('💥 Error deleting note:', err);
     res.status(500).json({ error: 'Failed to delete note' });
+  }
+});
+
+// ════════════════════════════════════════════════════════════════════
+// AI STANDUP SUMMARIZER
+// ════════════════════════════════════════════════════════════════════
+
+router.post('/standup/summarize', async (req, res) => {
+  try {
+    const { cohortId, date } = req.body;
+    if (!cohortId) return res.status(400).json({ error: 'cohortId is required' });
+
+    const cohort = await prisma.cohort.findUnique({ where: { id: cohortId } });
+    if (!cohort) return res.status(404).json({ error: 'Cohort not found' });
+    if (cohort.mentorId !== req.user.userId) {
+      return res.status(403).json({ error: 'You do not lead this cohort' });
+    }
+
+    // Get standups for the date
+    const targetDate = date ? new Date(date) : new Date();
+    const startOfDay = new Date(targetDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(targetDate);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const standups = await prisma.standup.findMany({
+      where: {
+        date: { gte: startOfDay, lte: endOfDay },
+        intern: { cohortId },
+      },
+      include: {
+        intern: { select: { name: true, internId: true } },
+      },
+    });
+
+    if (standups.length === 0) {
+      return res.status(404).json({ error: 'No standups found for this date' });
+    }
+
+    // Build standup text for AI
+    const standupText = standups.map((s) =>
+      `${s.intern.name} (${s.intern.internId}):
+- Yesterday: ${s.yesterday}
+- Today: ${s.today}
+- Blockers: ${s.blockers || 'None'}`
+    ).join('\n\n');
+
+    const prompt = `You are a team lead summarizing daily standup updates from software engineering interns.
+
+Here are today's standups:
+
+${standupText}
+
+Write a concise team summary that:
+- Highlights what the team accomplished yesterday (2-3 sentences)
+- Highlights what the team is working on today (2-3 sentences)
+- Lists any blockers that need attention (if any)
+- Identifies any common themes or patterns
+- Is written for a manager or stakeholder to read quickly
+
+Format it with clear sections. Keep it under 150 words total.`;
+
+    const response = await getGroq().chat.completions.create({
+      model: 'llama-3.3-70b-versatile',
+      max_tokens: 500,
+      messages: [{ role: 'user', content: prompt }],
+    });
+
+    const summary = response.choices[0].message.content.trim();
+    res.json({
+      summary,
+      standupCount: standups.length,
+      date: targetDate.toISOString().split('T')[0],
+    });
+  } catch (err) {
+    console.error('💥 Error summarizing standups:', err);
+    res.status(500).json({ error: 'Failed to summarize standups: ' + err.message });
   }
 });
 

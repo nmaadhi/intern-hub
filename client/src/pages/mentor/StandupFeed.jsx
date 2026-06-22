@@ -10,7 +10,12 @@ export default function StandupFeed() {
   );
   const [feed, setFeed] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [newStandup, setNewStandup] = useState(null); // live incoming standup
+  const [newStandup, setNewStandup] = useState(null);
+
+  // AI Summary
+  const [summarizing, setSummarizing] = useState(false);
+  const [summary, setSummary] = useState(null);
+  const [summaryError, setSummaryError] = useState('');
 
   useEffect(() => {
     api.get('/mentor/cohorts').then((res) => {
@@ -23,6 +28,8 @@ export default function StandupFeed() {
   const loadFeed = async () => {
     if (!selectedCohortId) return;
     setLoading(true);
+    setSummary(null);
+    setSummaryError('');
     try {
       const res = await api.get(
         `/standup/feed?cohortId=${selectedCohortId}&date=${selectedDate}`
@@ -46,7 +53,6 @@ export default function StandupFeed() {
     socket.emit('join:cohort', selectedCohortId);
 
     const onStandupNew = ({ standup }) => {
-      // Only show if it matches selected date
       const standupDate = new Date(standup.date).toISOString().split('T')[0];
       if (standupDate !== selectedDate) return;
 
@@ -54,12 +60,9 @@ export default function StandupFeed() {
 
       setFeed((prev) => {
         if (!prev) return prev;
-
-        // Update or add standup in feed
         const existingIdx = prev.standups.findIndex(
           (s) => s.internId === standup.internId
         );
-
         let updatedStandups;
         if (existingIdx >= 0) {
           updatedStandups = [...prev.standups];
@@ -67,12 +70,9 @@ export default function StandupFeed() {
         } else {
           updatedStandups = [...prev.standups, standup];
         }
-
-        // Remove from missing list
         const updatedMissing = prev.missing.filter(
           (m) => m.id !== standup.internId
         );
-
         return {
           ...prev,
           standups: updatedStandups,
@@ -81,13 +81,30 @@ export default function StandupFeed() {
         };
       });
 
-      // Clear new standup notification after 5 seconds
       setTimeout(() => setNewStandup(null), 5000);
     };
 
     socket.on('standup:new', onStandupNew);
     return () => socket.off('standup:new', onStandupNew);
   }, [selectedCohortId, selectedDate]);
+
+  // AI Summarize
+  const handleSummarize = async () => {
+    setSummarizing(true);
+    setSummary(null);
+    setSummaryError('');
+    try {
+      const res = await api.post('/mentor/standup/summarize', {
+        cohortId: selectedCohortId,
+        date: selectedDate,
+      });
+      setSummary(res.data);
+    } catch (err) {
+      setSummaryError(err.response?.data?.error || 'Failed to generate summary');
+    } finally {
+      setSummarizing(false);
+    }
+  };
 
   const fmtTime = (s) =>
     new Date(s).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -97,11 +114,30 @@ export default function StandupFeed() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h2 className="text-2xl font-bold text-gray-800">Standup Feed</h2>
-        <p className="text-sm text-gray-500 mt-1">
-          See what your interns are working on every day
-        </p>
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-800">Standup Feed</h2>
+          <p className="text-sm text-gray-500 mt-1">
+            See what your interns are working on every day
+          </p>
+        </div>
+        {/* AI Summarize button */}
+        {feed && feed.standups.length > 0 && (
+          <button
+            onClick={handleSummarize}
+            disabled={summarizing}
+            className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 disabled:opacity-50 transition text-sm font-medium"
+          >
+            {summarizing ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Summarizing...
+              </>
+            ) : (
+              '✨ AI Summarize'
+            )}
+          </button>
+        )}
       </div>
 
       {/* Live notification */}
@@ -116,6 +152,36 @@ export default function StandupFeed() {
               Today: {newStandup.today}
             </p>
           </div>
+        </div>
+      )}
+
+      {/* AI Summary result */}
+      {summary && (
+        <div className="bg-purple-50 border border-purple-200 rounded-2xl p-5">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">✨</span>
+              <h3 className="font-bold text-purple-800">AI Team Summary</h3>
+              <span className="text-xs bg-purple-200 text-purple-700 px-2 py-0.5 rounded-full">
+                {summary.standupCount} standups · {summary.date}
+              </span>
+            </div>
+            <button
+              onClick={() => setSummary(null)}
+              className="text-purple-400 hover:text-purple-600 text-xs"
+            >
+              ✕ Close
+            </button>
+          </div>
+          <div className="text-sm text-purple-900 whitespace-pre-wrap leading-relaxed">
+            {summary.summary}
+          </div>
+        </div>
+      )}
+
+      {summaryError && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700">
+          {summaryError}
         </div>
       )}
 
@@ -209,7 +275,6 @@ export default function StandupFeed() {
         <div className="space-y-4">
           {feed.standups.map((s) => (
             <div key={s.id} className="bg-white rounded-2xl shadow-sm p-5">
-              {/* Intern header */}
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-full bg-purple-100 flex items-center justify-center font-bold text-purple-700 text-sm">
@@ -230,7 +295,6 @@ export default function StandupFeed() {
                 </div>
               </div>
 
-              {/* Standup content */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="bg-gray-50 rounded-xl p-3">
                   <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">
