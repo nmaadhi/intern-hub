@@ -1,126 +1,156 @@
-// server/utils/email.js
-// Email sending via Resend (https://resend.com)
+const nodemailer = require('nodemailer');
 
-const { Resend } = require('resend');
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.GMAIL_USER,
+    pass: process.env.GMAIL_PASS,
+  },
+});
 
-let resend = null;
-function getResend() {
-  if (!resend) {
-    if (!process.env.RESEND_API_KEY) {
-      throw new Error('RESEND_API_KEY missing in .env');
-    }
-    resend = new Resend(process.env.RESEND_API_KEY);
-  }
-  return resend;
-}
-
-const FROM_ADDRESS = 'InternHub <onboarding@resend.dev>';
 const APP_URL = process.env.CLIENT_URL || 'http://localhost:5173';
+const FROM = `"InternHub" <${process.env.GMAIL_USER}>`;
 
-async function sendEmail({ to, subject, html, text }) {
+async function sendMentorWelcome({ name, email, tempPassword, setupToken }) {
+  const setPasswordLink = setupToken
+    ? `${APP_URL}/reset-password?token=${setupToken}`
+    : `${APP_URL}/forgot-password`;
+
   try {
-    const result = await getResend().emails.send({ from: FROM_ADDRESS, to, subject, html, text });
-    if (result.error) {
-      console.error('📧 Resend error:', result.error);
-      throw new Error(result.error.message || 'Email send failed');
-    }
-    console.log(`📧 Email sent to ${to} (id: ${result.data?.id})`);
-    return { sent: true, id: result.data?.id, to };
+    await transporter.sendMail({
+      from: FROM,
+      to: email,
+      subject: 'Welcome to InternHub — Your Mentor Account',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px;">
+          <h2 style="color: #7c3aed;">Welcome to InternHub, ${name}!</h2>
+          <p>Your mentor account has been created. Here are your login details:</p>
+
+          <div style="background: #f3f4f6; padding: 16px; border-radius: 8px; margin: 16px 0; border-left: 4px solid #7c3aed;">
+            <p style="margin: 4px 0;"><strong>Login URL:</strong> <a href="${APP_URL}/login">${APP_URL}/login</a></p>
+            <p style="margin: 4px 0;"><strong>Email:</strong> ${email}</p>
+            <p style="margin: 8px 0; font-size: 18px;">
+              <strong>Temporary Password:</strong>
+              <span style="background:#fff; padding:4px 10px; border-radius:4px; font-family:monospace; color:#7c3aed; font-size:16px; letter-spacing:1px;">
+                ${tempPassword}
+              </span>
+            </p>
+          </div>
+
+          <p style="color: #374151;">
+            You can login directly using the temporary password above.<br/>
+            <strong>Optionally</strong>, if you want to set your own password, click the button below:
+          </p>
+
+          <a href="${setPasswordLink}"
+            style="background:#7c3aed; color:white; padding:12px 24px; border-radius:8px; text-decoration:none; display:inline-block; margin:12px 0; font-weight:bold;">
+            Set My Own Password (Optional)
+          </a>
+
+          <p style="color:#e53e3e; font-size:12px; margin-top:8px;">
+            ⚠️ This link expires in <strong>1 hour</strong>. After that, use the temporary password to login.
+          </p>
+          <p style="color:#9ca3af; font-size:11px; margin-top:16px;">
+            If you did not expect this email, please ignore it.
+          </p>
+        </div>
+      `,
+    });
+    console.log(`✅ Welcome email sent to mentor: ${email}`);
   } catch (err) {
-    console.error('💥 Failed to send email:', err);
+    console.error(`❌ Failed to send mentor welcome email:`, err.message);
     throw err;
   }
 }
 
-// Welcome email - sent when admin creates a mentor or intern.
-// Gives them BOTH a temp password (instant login) AND a link to set
-// their own password right away (valid 48 hours).
-async function sendWelcomeEmail({ name, email, role, tempPassword, identifier, resetLink }) {
-  const subject = `Welcome to InternHub, ${name}!`;
+async function sendInternWelcome({ name, email, internId, tempPassword, setupToken }) {
+  const setPasswordLink = setupToken
+    ? `${APP_URL}/reset-password?token=${setupToken}`
+    : `${APP_URL}/forgot-password`;
 
-  const text = `Hi ${name},
+  try {
+    await transporter.sendMail({
+      from: FROM,
+      to: email,
+      subject: 'Welcome to InternHub — Your Intern Account',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px;">
+          <h2 style="color: #059669;">Welcome to InternHub, ${name}!</h2>
+          <p>Your intern account has been created. Here are your login details:</p>
 
-Your InternHub account has been created.
+          <div style="background: #f3f4f6; padding: 16px; border-radius: 8px; margin: 16px 0; border-left: 4px solid #059669;">
+            <p style="margin: 4px 0;"><strong>Login URL:</strong> <a href="${APP_URL}/login">${APP_URL}/login</a></p>
+            <p style="margin: 4px 0;"><strong>Email:</strong> ${email}</p>
+            <p style="margin: 4px 0;"><strong>Intern ID:</strong> ${internId}</p>
+            <p style="margin: 8px 0; font-size: 18px;">
+              <strong>Temporary Password:</strong>
+              <span style="background:#fff; padding:4px 10px; border-radius:4px; font-family:monospace; color:#059669; font-size:16px; letter-spacing:1px;">
+                ${tempPassword}
+              </span>
+            </p>
+          </div>
 
-  Role:        ${role}
-  Login with:  ${identifier}
-  Temporary password:  ${tempPassword}
+          <p style="color: #374151;">
+            You can login directly using the temporary password above.<br/>
+            <strong>Optionally</strong>, if you want to set your own password, click the button below:
+          </p>
 
-You can log in with the temporary password above (you will be asked to
-change it on first login), OR set your own password right away using
-this link (valid for 48 hours):
+          <a href="${setPasswordLink}"
+            style="background:#059669; color:white; padding:12px 24px; border-radius:8px; text-decoration:none; display:inline-block; margin:12px 0; font-weight:bold;">
+            Set My Own Password (Optional)
+          </a>
 
-  ${resetLink}
-
-Log in here: ${APP_URL}/login
-
-- The InternHub Team`;
-
-  const html = `
-<div style="font-family: Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px;">
-  <h2 style="color: #2E75B6;">Welcome to InternHub, ${name}!</h2>
-  <p>Your InternHub account has been created.</p>
-
-  <table style="background: #f4f4f4; padding: 16px; border-radius: 6px; margin: 16px 0; width: 100%;">
-    <tr><td style="padding: 4px 8px;"><strong>Role:</strong></td><td>${role}</td></tr>
-    <tr><td style="padding: 4px 8px;"><strong>Login with:</strong></td><td>${identifier}</td></tr>
-    <tr><td style="padding: 4px 8px;"><strong>Temp password:</strong></td>
-        <td><code style="background:#fff;padding:2px 6px;border-radius:3px;">${tempPassword}</code></td></tr>
-  </table>
-
-  <p>You can log in with the temporary password above (you will be asked to change it
-     on first login), or set your own password right away using the button below.</p>
-
-  <p style="margin: 24px 0;">
-    <a href="${resetLink}" style="background: #16A34A; color: white; padding: 12px 24px; border-radius: 4px; text-decoration: none; display: inline-block; margin-right: 10px;">Set Your Own Password</a>
-  </p>
-
-  <p style="margin: 16px 0;">
-    <a href="${APP_URL}/login" style="background: #2E75B6; color: white; padding: 12px 24px; border-radius: 4px; text-decoration: none; display: inline-block;">Log in to InternHub</a>
-  </p>
-
-  <p style="color: #888; font-size: 12px; margin-top: 32px; border-top: 1px solid #eee; padding-top: 16px;">
-    The password-setup link above expires in 48 hours.<br/>
-    - The InternHub Team
-  </p>
-</div>`;
-
-  return sendEmail({ to: email, subject, html, text });
+          <p style="color:#e53e3e; font-size:12px; margin-top:8px;">
+            ⚠️ This link expires in <strong>1 hour</strong>. After that, use the temporary password to login.
+          </p>
+          <p style="color:#9ca3af; font-size:11px; margin-top:16px;">
+            If you did not expect this email, please ignore it.
+          </p>
+        </div>
+      `,
+    });
+    console.log(`✅ Welcome email sent to intern: ${email}`);
+  } catch (err) {
+    console.error(`❌ Failed to send intern welcome email:`, err.message);
+    throw err;
+  }
 }
 
-// Password reset email - sent for "forgot password" requests.
-// No credentials shown, just a secure link (valid 1 hour).
-async function sendPasswordResetEmail({ name, email, resetLink }) {
-  const subject = 'Reset your InternHub password';
+async function sendPasswordReset({ name, email, resetToken }) {
+  const resetLink = `${APP_URL}/reset-password?token=${resetToken}`;
+  try {
+    await transporter.sendMail({
+      from: FROM,
+      to: email,
+      subject: 'InternHub — Reset Your Password',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px;">
+          <h2 style="color: #1d4ed8;">Reset Your Password</h2>
+          <p>Hi ${name},</p>
+          <p>We received a request to reset your InternHub password. Click the button below:</p>
 
-  const text = `Hi ${name},
+          <a href="${resetLink}"
+            style="background:#1d4ed8; color:white; padding:12px 24px; border-radius:8px; text-decoration:none; display:inline-block; margin:16px 0; font-weight:bold;">
+            Reset My Password
+          </a>
 
-We received a request to reset your InternHub password.
-
-Reset your password here (valid for 1 hour):
-  ${resetLink}
-
-If you did not request this, you can safely ignore this email.
-
-- The InternHub Team`;
-
-  const html = `
-<div style="font-family: Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px;">
-  <h2 style="color: #2E75B6;">Reset your password</h2>
-  <p>Hi ${name}, we received a request to reset your InternHub password.</p>
-
-  <p style="margin: 24px 0;">
-    <a href="${resetLink}" style="background: #2E75B6; color: white; padding: 12px 24px; border-radius: 4px; text-decoration: none; display: inline-block;">Reset Password</a>
-  </p>
-
-  <p style="color: #888; font-size: 13px;">This link expires in 1 hour. If you did not request this, you can safely ignore this email.</p>
-
-  <p style="color: #888; font-size: 12px; margin-top: 32px; border-top: 1px solid #eee; padding-top: 16px;">
-    - The InternHub Team
-  </p>
-</div>`;
-
-  return sendEmail({ to: email, subject, html, text });
+          <p style="color:#e53e3e; font-size:13px;">
+            ⚠️ This link expires in <strong>1 hour</strong>.
+          </p>
+          <p style="color:#6b7280; font-size:12px;">
+            If you did not request this, ignore this email — your password will not change.
+          </p>
+          <p style="color:#9ca3af; font-size:11px; margin-top:16px;">
+            Or copy this link: ${resetLink}
+          </p>
+        </div>
+      `,
+    });
+    console.log(`✅ Password reset email sent to: ${email}`);
+  } catch (err) {
+    console.error(`❌ Failed to send password reset email:`, err.message);
+    throw err;
+  }
 }
 
-module.exports = { sendEmail, sendWelcomeEmail, sendPasswordResetEmail };
+module.exports = { sendMentorWelcome, sendInternWelcome, sendPasswordReset };

@@ -60,13 +60,17 @@ function InternLayout() {
             <Link to="/intern/notes" className="text-sm text-gray-600 hover:text-emerald-600 transition">Notes</Link>
             <Link to="/intern/sprint" className="text-sm text-gray-600 hover:text-emerald-600 font-medium transition">🏃 Sprint</Link>
             <Link to="/intern/polls" className="text-sm text-gray-600 hover:text-emerald-600 transition">📊 Polls</Link>
-            <Link to="/intern/profile" className="text-sm text-gray-600 hover:text-emerald-600 transition">Profile</Link>
             <Link to="/intern/announcements" className="text-sm text-gray-600 hover:text-emerald-600 transition">📢 Announcements</Link>
-            
+            <Link to="/intern/profile" className="text-sm text-gray-600 hover:text-emerald-600 transition">Profile</Link>
           </nav>
           <div className="flex items-center gap-3">
             <NotificationBell />
-            <span className="text-sm text-gray-600">{user?.name}</span>
+            <div className="flex flex-col items-end">
+              <span className="text-sm text-gray-600">{user?.name}</span>
+              <Link to="/change-password" className="text-xs text-gray-400 hover:text-emerald-600 transition">
+                Change Password
+              </Link>
+            </div>
             <button
               onClick={() => setShowLogoutModal(true)}
               className="text-sm bg-red-500 text-white px-3 py-1.5 rounded-lg hover:bg-red-600 active:bg-red-700 transition font-medium"

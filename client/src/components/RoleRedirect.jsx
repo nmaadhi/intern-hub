@@ -2,28 +2,15 @@
 import useAuthStore from '../store/authStore';
 
 function RoleRedirect() {
-  const user = useAuthStore((state) => state.user);
-  const token = useAuthStore((state) => state.token);
+  const token = useAuthStore((s) => s.token);
+  const user = useAuthStore((s) => s.user);
 
-  if (!token || !user) {
-    return <Navigate to="/login" replace />;
-  }
+  if (!token || !user) return <Navigate to="/login" replace />;
 
-  if (user.mustChangePassword) {
-    return <Navigate to="/change-password" replace />;
-  }
-
-  if (user.role === 'ADMIN') {
-    return <Navigate to="/admin" replace />;
-  }
-
-  if (user.role === 'MENTOR') {
-    return <Navigate to="/mentor" replace />;
-  }
-
-  if (user.role === 'INTERN') {
-    return <Navigate to="/intern" replace />;
-  }
+  // No forced password change — they can change via email link or forgot password
+  if (user.role === 'ADMIN') return <Navigate to="/admin" replace />;
+  if (user.role === 'MENTOR') return <Navigate to="/mentor" replace />;
+  if (user.role === 'INTERN') return <Navigate to="/intern" replace />;
 
   return <Navigate to="/login" replace />;
 }

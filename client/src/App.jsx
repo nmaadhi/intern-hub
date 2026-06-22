@@ -9,7 +9,7 @@ import InternLayout from './layouts/InternLayout';
 
 const Login = lazy(() => import('./pages/Login'));
 const NotFound = lazy(() => import('./pages/NotFound'));
-const ForcePasswordChange = lazy(() => import('./pages/ForcePasswordChange'));
+const ChangePassword = lazy(() => import('./pages/ChangePassword'));
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 
@@ -64,7 +64,7 @@ function App() {
         <Route path="/reset-password" element={<ResetPassword />} />
 
         <Route element={<ProtectedRoute />}>
-          <Route path="/change-password" element={<ForcePasswordChange />} />
+          <Route path="/change-password" element={<ChangePassword />} />
         </Route>
 
         <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>

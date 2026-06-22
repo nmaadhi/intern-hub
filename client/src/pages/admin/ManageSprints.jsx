@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import api from '../../lib/api';
+import { useFormPersist } from '../../hooks/useFormPersist';
 
 const PHASE_COLORS = {
   PLANNING: 'bg-amber-100 text-amber-700 border-amber-200',
@@ -14,8 +15,6 @@ const PHASE_ICONS = {
   REVIEW: '🔍',
   COMPLETED: '✅',
 };
-
-const STORY_POINTS = [0, 1, 2, 3, 5, 8, 13];
 
 function PhaseBar({ phase }) {
   const phases = ['PLANNING', 'ACTIVE', 'REVIEW', 'COMPLETED'];
@@ -37,19 +36,15 @@ export default function ManageSprints() {
   const [cohorts, setCohorts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-
   const [showForm, setShowForm] = useState(false);
-  const [cohortId, setCohortId] = useState('');
-  const [name, setName] = useState('');
-  const [goal, setGoal] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [capacity, setCapacity] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [createMessage, setCreateMessage] = useState(null);
-
   const [filterPhase, setFilterPhase] = useState('all');
   const [filterCohort, setFilterCohort] = useState('all');
+
+  const { values, setValue, resetForm } = useFormPersist('admin-create-sprint', {
+    cohortId: '', name: '', goal: '', startDate: '', endDate: '', capacity: '',
+  });
 
   const loadAll = async () => {
     setLoading(true);
@@ -76,13 +71,15 @@ export default function ManageSprints() {
     setCreateMessage(null);
     try {
       await api.post('/sprint/sprints', {
-        cohortId, name, goal: goal || undefined,
-        startDate, endDate,
-        capacity: capacity ? parseInt(capacity) : undefined,
+        cohortId: values.cohortId,
+        name: values.name,
+        goal: values.goal || undefined,
+        startDate: values.startDate,
+        endDate: values.endDate,
+        capacity: values.capacity ? parseInt(values.capacity) : undefined,
       });
       setCreateMessage({ success: true });
-      setName(''); setGoal(''); setStartDate(''); setEndDate('');
-      setCohortId(''); setCapacity('');
+      resetForm();
       setShowForm(false);
       await loadAll();
     } catch (err) {
@@ -115,7 +112,10 @@ export default function ManageSprints() {
           <h2 className="text-2xl font-bold text-gray-800">Sprint Management</h2>
           <p className="text-gray-600 text-sm mt-1">Create and monitor sprints across all cohorts</p>
         </div>
-        <button onClick={() => { setShowForm(!showForm); setCreateMessage(null); }} className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition font-medium">
+        <button
+          onClick={() => { setShowForm(!showForm); setCreateMessage(null); }}
+          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition font-medium"
+        >
           {showForm ? 'Cancel' : '+ New Sprint'}
         </button>
       </div>
@@ -144,7 +144,12 @@ export default function ManageSprints() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Cohort</label>
-                <select value={cohortId} onChange={(e) => setCohortId(e.target.value)} required className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <select
+                  value={values.cohortId}
+                  onChange={(e) => setValue('cohortId', e.target.value)}
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
                   <option value="">Select a cohort</option>
                   {cohorts.map((c) => (
                     <option key={c.id} value={c.id}>
@@ -155,54 +160,110 @@ export default function ManageSprints() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Sprint name</label>
-                <input type="text" value={name} onChange={(e) => setName(e.target.value)} required className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Sprint 1" />
+                <input
+                  type="text"
+                  value={values.name}
+                  onChange={(e) => setValue('name', e.target.value)}
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Sprint 1"
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Start date</label>
-                <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} required className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                <input
+                  type="date"
+                  value={values.startDate}
+                  onChange={(e) => setValue('startDate', e.target.value)}
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">End date</label>
-                <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} required className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                <input
+                  type="date"
+                  value={values.endDate}
+                  onChange={(e) => setValue('endDate', e.target.value)}
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Capacity (story points, optional)</label>
-                <input type="number" value={capacity} onChange={(e) => setCapacity(e.target.value)} min={0} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g. 40" />
-                <p className="text-xs text-gray-400 mt-1">Total story points the team can handle this sprint</p>
+                <input
+                  type="number"
+                  value={values.capacity}
+                  onChange={(e) => setValue('capacity', e.target.value)}
+                  min={0}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="e.g. 40"
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Sprint goal (optional)</label>
-                <input type="text" value={goal} onChange={(e) => setGoal(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Complete the authentication module" />
+                <input
+                  type="text"
+                  value={values.goal}
+                  onChange={(e) => setValue('goal', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Complete the authentication module"
+                />
               </div>
             </div>
             <div className="bg-blue-50 rounded-lg p-3 text-sm text-blue-700">
-              Sprint will be created in <strong>Planning</strong> phase. The cohort's mentor will add cards and story points before starting it.
+              Sprint will be created in <strong>Planning</strong> phase.
             </div>
-            <button type="submit" disabled={submitting} className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition font-medium">
+            <button
+              type="submit"
+              disabled={submitting}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition font-medium"
+            >
               {submitting ? 'Creating...' : 'Create Sprint'}
             </button>
           </form>
         </div>
       )}
 
-      {createMessage?.success && (<div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-emerald-800">Sprint created successfully in Planning phase.</div>)}
-      {createMessage?.error && (<div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 text-sm">{createMessage.error}</div>)}
+      {createMessage?.success && (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-emerald-800">
+          Sprint created successfully in Planning phase.
+        </div>
+      )}
+      {createMessage?.error && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 text-sm">
+          {createMessage.error}
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex gap-3 flex-wrap items-center">
         <div className="flex gap-2 flex-wrap">
           {['all', 'PLANNING', 'ACTIVE', 'REVIEW', 'COMPLETED'].map((p) => (
-            <button key={p} onClick={() => setFilterPhase(p)} className={`text-xs px-3 py-1.5 rounded-full font-medium transition ${filterPhase === p ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+            <button
+              key={p}
+              onClick={() => setFilterPhase(p)}
+              className={`text-xs px-3 py-1.5 rounded-full font-medium transition ${filterPhase === p ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+            >
               {p === 'all' ? 'All phases' : `${PHASE_ICONS[p]} ${p}`}
             </button>
           ))}
         </div>
-        <select value={filterCohort} onChange={(e) => setFilterCohort(e.target.value)} className="text-xs px-3 py-1.5 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500">
+        <select
+          value={filterCohort}
+          onChange={(e) => setFilterCohort(e.target.value)}
+          className="text-xs px-3 py-1.5 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
           <option value="all">All cohorts</option>
           {cohorts.map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}
         </select>
         {(filterPhase !== 'all' || filterCohort !== 'all') && (
-          <button onClick={() => { setFilterPhase('all'); setFilterCohort('all'); }} className="text-xs text-gray-400 hover:text-gray-600 underline">Clear</button>
+          <button
+            onClick={() => { setFilterPhase('all'); setFilterCohort('all'); }}
+            className="text-xs text-gray-400 hover:text-gray-600 underline"
+          >
+            Clear
+          </button>
         )}
       </div>
 
@@ -239,14 +300,13 @@ export default function ManageSprints() {
                   <div className="flex items-center gap-4 mt-2 text-xs text-gray-500 flex-wrap">
                     <span>{fmtDate(s.startDate)} → {fmtDate(s.endDate)}</span>
                     <span>{s.taskCount} cards</span>
-                    {s.totalPoints > 0 && (<span>{s.completedPoints}/{s.totalPoints} pts</span>)}
-                    {s.capacity > 0 && (<span>Capacity: {s.capacity} pts</span>)}
+                    {s.totalPoints > 0 && <span>{s.completedPoints}/{s.totalPoints} pts</span>}
+                    {s.capacity > 0 && <span>Capacity: {s.capacity} pts</span>}
                     {s.phase === 'COMPLETED' && s.velocity > 0 && (
                       <span className="text-emerald-600 font-medium">Velocity: {s.velocity} pts</span>
                     )}
                   </div>
 
-                  {/* Progress bar — only show when active or beyond */}
                   {['ACTIVE', 'REVIEW', 'COMPLETED'].includes(s.phase) && s.totalPoints > 0 && (
                     <div className="mt-3">
                       <div className="flex justify-between text-xs text-gray-500 mb-1">

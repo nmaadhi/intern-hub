@@ -8,7 +8,7 @@ const prisma = require('../prisma');
 const { hashPassword, comparePassword } = require('../utils/password');
 const { verifyToken } = require('../middleware/auth');
 const { generateToken } = require('../utils/generateToken');
-const { sendPasswordResetEmail } = require('../utils/email');
+const { sendPasswordReset } = require('../utils/email');
 
 function validatePasswordStrength(pw) {
   if (!pw || pw.length < 8) return 'Password must be at least 8 characters';
@@ -19,7 +19,11 @@ function validatePasswordStrength(pw) {
 }
 
 function signToken(user) {
-  return jwt.sign({ userId: user.id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '7d' });
+  return jwt.sign(
+    { userId: user.id, role: user.role },
+    process.env.JWT_SECRET,
+    { expiresIn: '7d' }
+  );
 }
 
 function safeUser(user) {
@@ -32,10 +36,11 @@ function safeUser(user) {
     role: user.role,
     status: user.status,
     mustChangePassword: user.mustChangePassword,
+    cohortId: user.cohortId || null,
   };
 }
 
-// ─── POST /login ─── accepts email OR intern ID ──────────────────────
+// ── POST /login ───────────────────────────────────────────────────
 router.post('/login', async (req, res) => {
   try {
     const { identifier, password } = req.body;
@@ -46,17 +51,15 @@ router.post('/login', async (req, res) => {
 
     const isEmail = identifier.includes('@');
     const user = await prisma.user.findUnique({
-      where: isEmail ? { email: identifier.toLowerCase().trim() } : { internId: identifier.trim() },
+      where: isEmail
+        ? { email: identifier.toLowerCase().trim() }
+        : { internId: identifier.trim() },
     });
 
-    if (!user) {
-      return res.status(401).json({ error: 'Invalid credentials' });
-    }
+    if (!user) return res.status(401).json({ error: 'Invalid credentials' });
 
     const valid = await comparePassword(password, user.password);
-    if (!valid) {
-      return res.status(401).json({ error: 'Invalid credentials' });
-    }
+    if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
 
     if (user.status !== 'ACTIVE') {
       return res.status(403).json({ error: 'Account is not active' });
@@ -70,13 +73,11 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// ─── GET /me ─── current logged-in user ───────────────────────────────
+// ── GET /me ───────────────────────────────────────────────────────
 router.get('/me', verifyToken, async (req, res) => {
   try {
     const user = await prisma.user.findUnique({ where: { id: req.user.userId } });
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
+    if (!user) return res.status(404).json({ error: 'User not found' });
     res.json({ user: safeUser(user) });
   } catch (err) {
     console.error('💥 /me error:', err);
@@ -84,32 +85,31 @@ router.get('/me', verifyToken, async (req, res) => {
   }
 });
 
-// ─── POST /change-password ─── requires current password (re-auth) ──
-router.post('/change-password', verifyToken, async (req, res) => {
+// ── PATCH /change-password ────────────────────────────────────────
+// Logged-in user — must provide current password
+router.patch('/change-password', verifyToken, async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
 
     if (!currentPassword || !newPassword) {
-      return res.status(400).json({ error: 'Current and new password are required' });
+      return res.status(400).json({ error: 'Current password and new password are required' });
     }
 
     const user = await prisma.user.findUnique({ where: { id: req.user.userId } });
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
+    if (!user) return res.status(404).json({ error: 'User not found' });
 
     const valid = await comparePassword(currentPassword, user.password);
     if (!valid) {
-      return res.status(401).json({ error: 'Current password is incorrect' });
+      return res.status(400).json({ error: 'Current password is incorrect' });
+    }
+
+    if (currentPassword === newPassword) {
+      return res.status(400).json({ error: 'New password must be different from current password' });
     }
 
     const strengthError = validatePasswordStrength(newPassword);
     if (strengthError) {
       return res.status(400).json({ error: strengthError });
-    }
-
-    if (currentPassword === newPassword) {
-      return res.status(400).json({ error: 'New password must be different from current password' });
     }
 
     const hashed = await hashPassword(newPassword);
@@ -125,30 +125,25 @@ router.post('/change-password', verifyToken, async (req, res) => {
   }
 });
 
-// ─── POST /forgot-password ─── request a reset link via email ────────
+// ── POST /forgot-password ─────────────────────────────────────────
+// Only asks for email — no current password needed
 router.post('/forgot-password', async (req, res) => {
   try {
-    const { identifier } = req.body;
+    const { email } = req.body;
 
-    if (!identifier) {
-      return res.status(400).json({ error: 'Email or intern ID is required' });
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
     }
 
-    const isEmail = identifier.includes('@');
     const user = await prisma.user.findUnique({
-      where: isEmail ? { email: identifier.toLowerCase().trim() } : { internId: identifier.trim() },
+      where: { email: email.toLowerCase().trim() },
     });
 
-    // Always send back the SAME response whether or not the user exists.
-    // This stops attackers from using this endpoint to discover which
-    // emails/intern IDs are registered (a common security leak).
     const genericResponse = {
-      message: 'If an account exists for that identifier, a reset link has been sent.',
+      message: 'If an account exists for that email, a reset link has been sent.',
     };
 
-    if (!user) {
-      return res.json(genericResponse);
-    }
+    if (!user) return res.json(genericResponse);
 
     const token = generateToken();
     await prisma.passwordResetToken.create({
@@ -159,12 +154,14 @@ router.post('/forgot-password', async (req, res) => {
       },
     });
 
-    const resetLink = `http://localhost:5173/reset-password?token=${token}`;
-
     try {
-      await sendPasswordResetEmail({ name: user.name, email: user.email, resetLink });
+      await sendPasswordReset({
+        name: user.name,
+        email: user.email,
+        resetToken: token,
+      });
     } catch (err) {
-      console.error('⚠️  Failed to send reset email:', err);
+      console.error('⚠️  Failed to send reset email:', err.message);
     }
 
     res.json(genericResponse);
@@ -174,7 +171,7 @@ router.post('/forgot-password', async (req, res) => {
   }
 });
 
-// ─── GET /reset-password/:token ─── verify a token before showing form ─
+// ── GET /reset-password/:token ────────────────────────────────────
 router.get('/reset-password/:token', async (req, res) => {
   try {
     const { token } = req.params;
@@ -195,30 +192,42 @@ router.get('/reset-password/:token', async (req, res) => {
   }
 });
 
-// ─── POST /reset-password ─── set a new password using a valid token ──
+// ── POST /reset-password ──────────────────────────────────────────
+// Verifies current/temp password + sets new password
 router.post('/reset-password', async (req, res) => {
   try {
-    const { token, newPassword } = req.body;
+    const { token, currentPassword, password } = req.body;
 
-    if (!token || !newPassword) {
-      return res.status(400).json({ error: 'Token and new password are required' });
+    if (!token || !currentPassword || !password) {
+      return res.status(400).json({ error: 'Token, current password and new password are required' });
     }
 
-    const resetToken = await prisma.passwordResetToken.findUnique({ where: { token } });
+    const resetToken = await prisma.passwordResetToken.findUnique({
+      where: { token },
+      include: { user: true },
+    });
 
     if (!resetToken || resetToken.usedAt || resetToken.expiresAt < new Date()) {
       return res.status(400).json({ error: 'This reset link is invalid or has expired' });
     }
 
-    const strengthError = validatePasswordStrength(newPassword);
+    // Verify current/temporary password
+    const valid = await comparePassword(currentPassword, resetToken.user.password);
+    if (!valid) {
+      return res.status(400).json({ error: 'Current/temporary password is incorrect' });
+    }
+
+    if (currentPassword === password) {
+      return res.status(400).json({ error: 'New password must be different from current password' });
+    }
+
+    const strengthError = validatePasswordStrength(password);
     if (strengthError) {
       return res.status(400).json({ error: strengthError });
     }
 
-    const hashed = await hashPassword(newPassword);
+    const hashed = await hashPassword(password);
 
-    // Update the password AND mark the token used in one atomic transaction.
-    // Either both happen, or neither does - never a half-applied state.
     await prisma.$transaction([
       prisma.user.update({
         where: { id: resetToken.userId },
@@ -230,7 +239,7 @@ router.post('/reset-password', async (req, res) => {
       }),
     ]);
 
-    res.json({ message: 'Password has been reset successfully. You can now log in.' });
+    res.json({ message: 'Password set successfully. You can now log in.' });
   } catch (err) {
     console.error('💥 Reset password error:', err);
     res.status(500).json({ error: 'Failed to reset password' });

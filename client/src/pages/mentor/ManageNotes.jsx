@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import api from '../../lib/api';
+import { useFormPersist } from '../../hooks/useFormPersist';
 
 const CLOUDINARY_CLOUD = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
 const CLOUDINARY_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
@@ -52,20 +53,23 @@ function ManageNotes() {
   const [interns, setInterns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-
   const [showForm, setShowForm] = useState(false);
-  const [noteType, setNoteType] = useState('cohort');
-  const [title, setTitle] = useState('');
-  const [content, setContent] = useState('');
-  const [cohortId, setCohortId] = useState('');
-  const [selectedInternIds, setSelectedInternIds] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [createMessage, setCreateMessage] = useState(null);
 
+  // File upload state — not persisted (files can't be stored in sessionStorage)
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [uploadedFile, setUploadedFile] = useState(null);
   const [uploadError, setUploadError] = useState('');
+
+  const { values, setValue, resetForm } = useFormPersist('mentor-create-note', {
+    noteType: 'cohort',
+    title: '',
+    content: '',
+    cohortId: '',
+    selectedInternIds: [],
+  });
 
   const activeCohorts = cohorts.filter((c) => c.status === 'ACTIVE');
 
@@ -90,15 +94,15 @@ function ManageNotes() {
 
   useEffect(() => { loadAll(); }, []);
 
-  const resetForm = () => {
-    setTitle(''); setContent(''); setCohortId('');
-    setSelectedInternIds([]); setNoteType('cohort');
-    setSelectedFile(null); setUploadedFile(null);
-    setUploadError(''); setCreateMessage(null);
+  const clearFileState = () => {
+    setSelectedFile(null);
+    setUploadedFile(null);
+    setUploadError('');
   };
 
   const toggleIntern = (id) => {
-    setSelectedInternIds((prev) =>
+    const prev = values.selectedInternIds;
+    setValue('selectedInternIds',
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     );
   };
@@ -129,15 +133,15 @@ function ManageNotes() {
     e.preventDefault();
     setCreateMessage(null);
 
-    if (!content.trim() && !uploadedFile) {
+    if (!values.content.trim() && !uploadedFile) {
       setCreateMessage({ success: false, error: 'Add text content, a file, or both' });
       return;
     }
-    if (noteType === 'cohort' && !cohortId) {
+    if (values.noteType === 'cohort' && !values.cohortId) {
       setCreateMessage({ success: false, error: 'Please select a cohort' });
       return;
     }
-    if (noteType === 'direct' && selectedInternIds.length === 0) {
+    if (values.noteType === 'direct' && values.selectedInternIds.length === 0) {
       setCreateMessage({ success: false, error: 'Select at least one intern' });
       return;
     }
@@ -149,15 +153,19 @@ function ManageNotes() {
     setSubmitting(true);
     try {
       const body = {
-        title,
-        content: content || undefined,
+        title: values.title,
+        content: values.content || undefined,
         fileUrl: uploadedFile?.fileUrl || undefined,
         fileName: uploadedFile?.fileName || undefined,
-        ...(noteType === 'cohort' ? { cohortId } : { internIds: selectedInternIds }),
+        ...(values.noteType === 'cohort'
+          ? { cohortId: values.cohortId }
+          : { internIds: values.selectedInternIds }),
       };
       await api.post('/mentor/notes', body);
       setCreateMessage({ success: true });
       resetForm();
+      clearFileState();
+      setShowForm(false);
       await loadAll();
     } catch (err) {
       setCreateMessage({ success: false, error: err.response?.data?.error || 'Failed to create note' });
@@ -185,7 +193,10 @@ function ManageNotes() {
           <h2 className="text-2xl font-bold text-gray-800">Notes</h2>
           <p className="text-gray-600 text-sm mt-1">Share text and files with your cohort or specific interns</p>
         </div>
-        <button onClick={() => { setShowForm(!showForm); resetForm(); }} className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition font-medium">
+        <button
+          onClick={() => { setShowForm(!showForm); setCreateMessage(null); clearFileState(); }}
+          className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition font-medium"
+        >
           {showForm ? 'Cancel' : '+ New Note'}
         </button>
       </div>
@@ -194,12 +205,19 @@ function ManageNotes() {
         <div className="bg-white rounded-2xl shadow-sm p-6">
           <h3 className="text-lg font-bold text-gray-800 mb-4">Share a note</h3>
 
-          {/* Type toggle */}
           <div className="flex gap-2 mb-5">
-            <button type="button" onClick={() => setNoteType('cohort')} className={`flex-1 py-2 rounded-lg text-sm font-medium transition ${noteType === 'cohort' ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+            <button
+              type="button"
+              onClick={() => setValue('noteType', 'cohort')}
+              className={`flex-1 py-2 rounded-lg text-sm font-medium transition ${values.noteType === 'cohort' ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+            >
               For Cohort
             </button>
-            <button type="button" onClick={() => setNoteType('direct')} className={`flex-1 py-2 rounded-lg text-sm font-medium transition ${noteType === 'direct' ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+            <button
+              type="button"
+              onClick={() => setValue('noteType', 'direct')}
+              className={`flex-1 py-2 rounded-lg text-sm font-medium transition ${values.noteType === 'direct' ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+            >
               For Specific Interns
             </button>
           </div>
@@ -207,15 +225,27 @@ function ManageNotes() {
           <form onSubmit={handleCreate} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
-              <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} required minLength={2} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="Week 1 React Notes" />
+              <input
+                type="text"
+                value={values.title}
+                onChange={(e) => setValue('title', e.target.value)}
+                required
+                minLength={2}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                placeholder="Week 1 React Notes"
+              />
             </div>
-
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Content (optional if uploading a file)</label>
-              <textarea value={content} onChange={(e) => setContent(e.target.value)} rows={4} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="Write your notes here..." />
+              <textarea
+                value={values.content}
+                onChange={(e) => setValue('content', e.target.value)}
+                rows={4}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                placeholder="Write your notes here..."
+              />
             </div>
 
-            {/* File upload */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Attach a file (optional)
@@ -244,40 +274,59 @@ function ManageNotes() {
                     <FileIcon fileName={uploadedFile.fileName} />
                     <span className="text-sm text-purple-700 font-medium truncate max-w-xs">{uploadedFile.fileName}</span>
                   </div>
-                  <button type="button" onClick={() => { setUploadedFile(null); setSelectedFile(null); }} className="text-xs text-red-500 hover:text-red-700 underline ml-4">Remove</button>
+                  <button
+                    type="button"
+                    onClick={() => { setUploadedFile(null); setSelectedFile(null); }}
+                    className="text-xs text-red-500 hover:text-red-700 underline ml-4"
+                  >
+                    Remove
+                  </button>
                 </div>
               )}
-              {uploadError && (<p className="text-sm text-red-600 mt-1">{uploadError}</p>)}
+              {uploadError && <p className="text-sm text-red-600 mt-1">{uploadError}</p>}
             </div>
 
-            {/* Cohort selector */}
-            {noteType === 'cohort' && (
+            {values.noteType === 'cohort' && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Cohort</label>
                 {activeCohorts.length === 0 ? (
                   <p className="text-sm text-gray-500 bg-gray-50 p-3 rounded-lg">No active cohorts assigned to you.</p>
                 ) : (
-                  <select value={cohortId} onChange={(e) => setCohortId(e.target.value)} required className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
+                  <select
+                    value={values.cohortId}
+                    onChange={(e) => setValue('cohortId', e.target.value)}
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  >
                     <option value="">Select a cohort</option>
-                    {activeCohorts.map((c) => (<option key={c.id} value={c.id}>{c.name} ({c.internCount} interns)</option>))}
+                    {activeCohorts.map((c) => (
+                      <option key={c.id} value={c.id}>{c.name} ({c.internCount} interns)</option>
+                    ))}
                   </select>
                 )}
               </div>
             )}
 
-            {/* Intern selector */}
-            {noteType === 'direct' && (
+            {values.noteType === 'direct' && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Select interns <span className="text-gray-400 font-normal">({selectedInternIds.length} selected)</span>
+                  Select interns <span className="text-gray-400 font-normal">({values.selectedInternIds.length} selected)</span>
                 </label>
                 {interns.length === 0 ? (
                   <p className="text-sm text-gray-500 bg-gray-50 p-3 rounded-lg">No directly assigned interns.</p>
                 ) : (
                   <div className="border border-gray-300 rounded-lg divide-y max-h-48 overflow-y-auto">
                     {interns.map((i) => (
-                      <label key={i.id} className={`flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-purple-50 transition ${selectedInternIds.includes(i.id) ? 'bg-purple-50' : ''}`}>
-                        <input type="checkbox" checked={selectedInternIds.includes(i.id)} onChange={() => toggleIntern(i.id)} className="accent-purple-600" />
+                      <label
+                        key={i.id}
+                        className={`flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-purple-50 transition ${values.selectedInternIds.includes(i.id) ? 'bg-purple-50' : ''}`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={values.selectedInternIds.includes(i.id)}
+                          onChange={() => toggleIntern(i.id)}
+                          className="accent-purple-600"
+                        />
                         <div>
                           <p className="text-sm font-medium text-gray-800">{i.name}</p>
                           <p className="text-xs text-gray-500">{i.internId}</p>
@@ -289,19 +338,30 @@ function ManageNotes() {
               </div>
             )}
 
-            <button type="submit" disabled={submitting || uploading} className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 disabled:opacity-50 transition font-medium">
+            <button
+              type="submit"
+              disabled={submitting || uploading}
+              className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 disabled:opacity-50 transition font-medium"
+            >
               {submitting ? 'Sharing...' : 'Share Note'}
             </button>
           </form>
         </div>
       )}
 
-      {createMessage?.success && (<div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-emerald-800">Note shared successfully.</div>)}
-      {createMessage?.error && (<div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 text-sm">{createMessage.error}</div>)}
+      {createMessage?.success && (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-emerald-800">Note shared successfully.</div>
+      )}
+      {createMessage?.error && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 text-sm">{createMessage.error}</div>
+      )}
 
-      {/* Notes list */}
       <div className="space-y-3">
-        {loading ? (<p className="text-gray-500 text-center py-4">Loading...</p>) : error ? (<p className="text-red-600 text-center py-4">{error}</p>) : notes.length === 0 ? (
+        {loading ? (
+          <p className="text-gray-500 text-center py-4">Loading...</p>
+        ) : error ? (
+          <p className="text-red-600 text-center py-4">{error}</p>
+        ) : notes.length === 0 ? (
           <p className="text-gray-500 text-center py-8 bg-white rounded-2xl shadow-sm">No notes yet. Create one above.</p>
         ) : (
           notes.map((n) => (
@@ -311,11 +371,11 @@ function ManageNotes() {
                   <div className="flex items-center gap-2 flex-wrap">
                     <h3 className="font-bold text-gray-800">{n.title}</h3>
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${n.type === 'COHORT' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
-                      {n.type === 'COHORT' ? `Cohort: ${n.cohort?.name}` : `${n.recipients.map((r) => r.name).join(', ')}`}
+                      {n.type === 'COHORT' ? `Cohort: ${n.cohort?.name}` : n.recipients.map((r) => r.name).join(', ')}
                     </span>
                   </div>
                   <p className="text-xs text-gray-400 mt-1">{fmtDate(n.createdAt)}</p>
-                  {n.content && (<p className="text-sm text-gray-700 mt-2 whitespace-pre-wrap line-clamp-3">{n.content}</p>)}
+                  {n.content && <p className="text-sm text-gray-700 mt-2 whitespace-pre-wrap line-clamp-3">{n.content}</p>}
                   {n.fileUrl && (
                     <div className="flex items-center gap-3 mt-3 bg-gray-50 rounded-lg px-3 py-2">
                       <FileIcon fileName={n.fileName} />

@@ -13,16 +13,10 @@ function LogoutModal({ onConfirm, onCancel }) {
           <p className="text-sm text-gray-500 mb-6">You'll need to sign in again to access your dashboard.</p>
         </div>
         <div className="flex gap-3">
-          <button
-            onClick={onCancel}
-            className="flex-1 px-4 py-2 rounded-xl border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50 transition"
-          >
+          <button onClick={onCancel} className="flex-1 px-4 py-2 rounded-xl border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50 transition">
             Cancel
           </button>
-          <button
-            onClick={onConfirm}
-            className="flex-1 px-4 py-2 rounded-xl bg-red-500 text-white text-sm font-medium hover:bg-red-600 transition"
-          >
+          <button onClick={onConfirm} className="flex-1 px-4 py-2 rounded-xl bg-red-500 text-white text-sm font-medium hover:bg-red-600 transition">
             Yes, Logout
           </button>
         </div>
@@ -66,7 +60,12 @@ function AdminLayout() {
           </nav>
           <div className="flex items-center gap-3">
             <NotificationBell />
-            <span className="text-sm text-gray-600">{user?.name}</span>
+            <div className="flex flex-col items-end">
+              <span className="text-sm text-gray-600">{user?.name}</span>
+              <Link to="/change-password" className="text-xs text-gray-400 hover:text-blue-600 transition">
+                Change Password
+              </Link>
+            </div>
             <button
               onClick={() => setShowLogoutModal(true)}
               className="text-sm bg-red-500 text-white px-3 py-1.5 rounded-lg hover:bg-red-600 active:bg-red-700 transition font-medium"

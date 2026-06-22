@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import api from '../../lib/api';
+import { useFormPersist } from '../../hooks/useFormPersist';
 
 const STATUS_COLORS = {
   TODO: 'bg-gray-100 text-gray-600',
@@ -18,17 +19,18 @@ function ManageTasks() {
   const [interns, setInterns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-
   const [showForm, setShowForm] = useState(false);
-  const [assignedToId, setAssignedToId] = useState('');
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [dueDate, setDueDate] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [createMessage, setCreateMessage] = useState(null);
-
   const [filterIntern, setFilterIntern] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
+
+  const { values, setValue, resetForm } = useFormPersist('mentor-create-task', {
+    assignedToId: '',
+    title: '',
+    description: '',
+    dueDate: '',
+  });
 
   const loadAll = async () => {
     setLoading(true);
@@ -55,13 +57,13 @@ function ManageTasks() {
     setCreateMessage(null);
     try {
       await api.post('/mentor/tasks', {
-        assignedToId,
-        title,
-        description: description || undefined,
-        dueDate: dueDate || undefined,
+        assignedToId: values.assignedToId,
+        title: values.title,
+        description: values.description || undefined,
+        dueDate: values.dueDate || undefined,
       });
       setCreateMessage({ success: true });
-      setTitle(''); setDescription(''); setDueDate(''); setAssignedToId('');
+      resetForm();
       await loadAll();
     } catch (err) {
       setCreateMessage({ success: false, error: err.response?.data?.error || 'Failed to create task' });
@@ -108,7 +110,10 @@ function ManageTasks() {
           <h2 className="text-2xl font-bold text-gray-800">Tasks</h2>
           <p className="text-gray-600 text-sm mt-1">Assign and track individual tasks for your interns</p>
         </div>
-        <button onClick={() => { setShowForm(!showForm); setCreateMessage(null); }} className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition font-medium">
+        <button
+          onClick={() => { setShowForm(!showForm); setCreateMessage(null); }}
+          className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition font-medium"
+        >
           {showForm ? 'Cancel' : '+ New Task'}
         </button>
       </div>
@@ -133,29 +138,61 @@ function ManageTasks() {
         <div className="bg-white rounded-2xl shadow-sm p-6">
           <h3 className="text-lg font-bold text-gray-800 mb-4">Assign a new task</h3>
           {interns.length === 0 ? (
-            <p className="text-sm text-gray-500">No directly assigned interns yet. Ask admin to assign interns to you first.</p>
+            <p className="text-sm text-gray-500">
+              No directly assigned interns yet. Ask admin to assign interns to you first.
+            </p>
           ) : (
             <form onSubmit={handleCreate} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Assign to</label>
-                <select value={assignedToId} onChange={(e) => setAssignedToId(e.target.value)} required className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
+                <select
+                  value={values.assignedToId}
+                  onChange={(e) => setValue('assignedToId', e.target.value)}
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                >
                   <option value="">Select an intern</option>
-                  {interns.map((i) => (<option key={i.id} value={i.id}>{i.name} ({i.internId})</option>))}
+                  {interns.map((i) => (
+                    <option key={i.id} value={i.id}>{i.name} ({i.internId})</option>
+                  ))}
                 </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
-                <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} required minLength={2} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="Set up the development environment" />
+                <input
+                  type="text"
+                  value={values.title}
+                  onChange={(e) => setValue('title', e.target.value)}
+                  required
+                  minLength={2}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  placeholder="Set up the development environment"
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Description (optional)</label>
-                <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="Any additional details..." />
+                <textarea
+                  value={values.description}
+                  onChange={(e) => setValue('description', e.target.value)}
+                  rows={2}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  placeholder="Any additional details..."
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Due date (optional)</label>
-                <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" />
+                <input
+                  type="date"
+                  value={values.dueDate}
+                  onChange={(e) => setValue('dueDate', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
               </div>
-              <button type="submit" disabled={submitting} className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 disabled:opacity-50 transition font-medium">
+              <button
+                type="submit"
+                disabled={submitting}
+                className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 disabled:opacity-50 transition font-medium"
+              >
                 {submitting ? 'Creating...' : 'Create Task'}
               </button>
             </form>
@@ -163,30 +200,55 @@ function ManageTasks() {
         </div>
       )}
 
-      {createMessage?.success && (<div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-emerald-800">Task created successfully.</div>)}
-      {createMessage?.error && (<div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 text-sm">{createMessage.error}</div>)}
+      {createMessage?.success && (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-emerald-800">
+          Task created successfully.
+        </div>
+      )}
+      {createMessage?.error && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 text-sm">
+          {createMessage.error}
+        </div>
+      )}
 
       {/* Filters */}
       {tasks.length > 0 && (
         <div className="flex gap-3 flex-wrap">
-          <select value={filterIntern} onChange={(e) => setFilterIntern(e.target.value)} className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
+          <select
+            value={filterIntern}
+            onChange={(e) => setFilterIntern(e.target.value)}
+            className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+          >
             <option value="all">All interns</option>
             {interns.map((i) => (<option key={i.id} value={i.id}>{i.name}</option>))}
           </select>
-          <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+            className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+          >
             <option value="all">All statuses</option>
             <option value="TODO">To Do</option>
             <option value="IN_PROGRESS">In Progress</option>
             <option value="DONE">Done</option>
           </select>
           {(filterIntern !== 'all' || filterStatus !== 'all') && (
-            <button onClick={() => { setFilterIntern('all'); setFilterStatus('all'); }} className="text-sm text-gray-500 underline">Clear filters</button>
+            <button
+              onClick={() => { setFilterIntern('all'); setFilterStatus('all'); }}
+              className="text-sm text-gray-500 underline"
+            >
+              Clear filters
+            </button>
           )}
         </div>
       )}
 
       <div className="space-y-2">
-        {loading ? (<p className="text-gray-500 text-center py-4">Loading...</p>) : error ? (<p className="text-red-600 text-center py-4">{error}</p>) : filteredTasks.length === 0 ? (
+        {loading ? (
+          <p className="text-gray-500 text-center py-4">Loading...</p>
+        ) : error ? (
+          <p className="text-red-600 text-center py-4">{error}</p>
+        ) : filteredTasks.length === 0 ? (
           <p className="text-gray-500 text-center py-8 bg-white rounded-2xl shadow-sm">
             {tasks.length === 0 ? 'No tasks yet. Create one above.' : 'No tasks match the selected filters.'}
           </p>
@@ -197,21 +259,34 @@ function ManageTasks() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="font-medium text-gray-800">{t.title}</p>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[t.status]}`}>{STATUS_LABELS[t.status]}</span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[t.status]}`}>
+                      {STATUS_LABELS[t.status]}
+                    </span>
                   </div>
                   <p className="text-xs text-gray-500 mt-0.5">
                     {t.assignedTo.name} ({t.assignedTo.internId})
                     {fmtDate(t.dueDate) ? ` · due ${fmtDate(t.dueDate)}` : ''}
                   </p>
-                  {t.description && (<p className="text-sm text-gray-600 mt-1">{t.description}</p>)}
+                  {t.description && (
+                    <p className="text-sm text-gray-600 mt-1">{t.description}</p>
+                  )}
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  <select value={t.status} onChange={(e) => handleStatusChange(t.id, e.target.value)} className="text-xs border border-gray-300 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                  <select
+                    value={t.status}
+                    onChange={(e) => handleStatusChange(t.id, e.target.value)}
+                    className="text-xs border border-gray-300 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  >
                     <option value="TODO">To Do</option>
                     <option value="IN_PROGRESS">In Progress</option>
                     <option value="DONE">Done</option>
                   </select>
-                  <button onClick={() => handleDelete(t.id)} className="text-xs text-red-400 hover:text-red-600 transition">Delete</button>
+                  <button
+                    onClick={() => handleDelete(t.id)}
+                    className="text-xs text-red-400 hover:text-red-600 transition"
+                  >
+                    Delete
+                  </button>
                 </div>
               </div>
             </div>
