@@ -62,9 +62,11 @@ model User {
   sentMessages     Message[] @relation("SentMessages")
   receivedMessages Message[] @relation("ReceivedMessages")
 
-  createdQuizzes Quiz[]          @relation("MentorQuizzes")
-  quizAttempts   QuizAttempt[]   @relation("InternQuizAttempts")
-  quizRecipients QuizRecipient[] @relation("InternQuizRecipients")
+  createdQuizzes  Quiz[]          @relation("MentorQuizzes")
+  quizAttempts    QuizAttempt[]   @relation("InternQuizAttempts")
+  quizRecipients  QuizRecipient[] @relation("InternQuizRecipients")
+
+  codeSubmissions CodeSubmission[] @relation("InternCodeSubmissions")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -298,6 +300,9 @@ model SprintTask {
   blocked     Boolean @default(false)
   order       Int     @default(0)
 
+  isCodeTask   Boolean @default(false)
+  codeLanguage String? @default("python")
+
   sprintId String
   sprint   Sprint @relation(fields: [sprintId], references: [id], onDelete: Cascade)
 
@@ -306,6 +311,8 @@ model SprintTask {
 
   createdById String
   createdBy   User   @relation("MentorSprintTasks", fields: [createdById], references: [id])
+
+  codeSubmissions CodeSubmission[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -515,5 +522,27 @@ model QuizRecipient {
 
   @@unique([quizId, internId])
   @@index([quizId])
+  @@index([internId])
+}
+
+model CodeSubmission {
+  id              String  @id @default(cuid())
+  code            String
+  language        String
+  executionOutput String?
+  executionError  String?
+  aiReview        String?
+  aiVerdict       String  @default("PENDING")
+  passed          Boolean @default(false)
+
+  taskId String
+  task   SprintTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  internId String
+  intern   User   @relation("InternCodeSubmissions", fields: [internId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([taskId])
   @@index([internId])
 }

@@ -46,7 +46,6 @@ function ResetPassword() {
   const token = searchParams.get('token');
   const navigate = useNavigate();
 
-  const [currentPassword, setCurrentPassword] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [loading, setLoading] = useState(false);
@@ -58,25 +57,17 @@ function ResetPassword() {
     setError('');
 
     if (password !== confirm) {
-      setError('New passwords do not match');
+      setError('Passwords do not match');
       return;
     }
     if (password.length < 8) {
-      setError('New password must be at least 8 characters');
-      return;
-    }
-    if (currentPassword === password) {
-      setError('New password must be different from current password');
+      setError('Password must be at least 8 characters');
       return;
     }
 
     setLoading(true);
     try {
-      await api.post('/auth/reset-password', {
-        token,
-        currentPassword,
-        password,
-      });
+      await api.post('/auth/reset-password', { token, password });
       setSuccess(true);
       setTimeout(() => navigate('/login'), 3000);
     } catch (err) {
@@ -104,10 +95,8 @@ function ResetPassword() {
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="bg-white rounded-2xl shadow-sm p-8 max-w-md text-center">
           <div className="text-5xl mb-4">✅</div>
-          <h3 className="text-xl font-bold text-gray-800">Password Changed!</h3>
-          <p className="text-gray-500 text-sm mt-2">
-            Redirecting to login in 3 seconds...
-          </p>
+          <h3 className="text-xl font-bold text-gray-800">Password Reset!</h3>
+          <p className="text-gray-500 text-sm mt-2">Redirecting to login in 3 seconds...</p>
         </div>
       </div>
     );
@@ -119,18 +108,10 @@ function ResetPassword() {
         <div className="text-center mb-6">
           <h1 className="text-2xl font-black text-purple-600">InternHub</h1>
           <h2 className="text-xl font-bold text-gray-800 mt-2">Set New Password</h2>
-          <p className="text-sm text-gray-500 mt-1">
-            Enter your current/temporary password then choose a new one
-          </p>
+          <p className="text-sm text-gray-500 mt-1">Choose a strong new password for your account</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <PasswordInput
-            label="Current / Temporary Password"
-            value={currentPassword}
-            onChange={(e) => setCurrentPassword(e.target.value)}
-            placeholder="Enter the password from the email"
-          />
           <PasswordInput
             label="New Password"
             value={password}
@@ -160,9 +141,7 @@ function ResetPassword() {
         </form>
 
         <div className="mt-4 text-center">
-          <a href="/login" className="text-sm text-gray-500 hover:text-purple-600">
-            ← Back to Login
-          </a>
+          <a href="/login" className="text-sm text-gray-500 hover:text-purple-600">← Back to Login</a>
         </div>
       </div>
     </div>

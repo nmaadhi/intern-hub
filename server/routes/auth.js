@@ -62,7 +62,7 @@ router.post('/login', async (req, res) => {
     if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
 
     if (user.status !== 'ACTIVE') {
-      return res.status(403).json({ error: 'Account is not active' });
+      return res.status(403).json({ error: 'Your account has been deactivated. Contact your admin.' });
     }
 
     const token = signToken(user);
@@ -86,7 +86,6 @@ router.get('/me', verifyToken, async (req, res) => {
 });
 
 // ── PATCH /change-password ────────────────────────────────────────
-// Logged-in user — must provide current password
 router.patch('/change-password', verifyToken, async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
@@ -126,7 +125,6 @@ router.patch('/change-password', verifyToken, async (req, res) => {
 });
 
 // ── POST /forgot-password ─────────────────────────────────────────
-// Only asks for email — no current password needed
 router.post('/forgot-password', async (req, res) => {
   try {
     const { email } = req.body;
@@ -150,7 +148,7 @@ router.post('/forgot-password', async (req, res) => {
       data: {
         userId: user.id,
         token,
-        expiresAt: new Date(Date.now() + 60 * 60 * 1000), // 1 hour
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
       },
     });
 
@@ -193,13 +191,13 @@ router.get('/reset-password/:token', async (req, res) => {
 });
 
 // ── POST /reset-password ──────────────────────────────────────────
-// Verifies current/temp password + sets new password
+// No current password needed — link from email is enough
 router.post('/reset-password', async (req, res) => {
   try {
-    const { token, currentPassword, password } = req.body;
+    const { token, password } = req.body;
 
-    if (!token || !currentPassword || !password) {
-      return res.status(400).json({ error: 'Token, current password and new password are required' });
+    if (!token || !password) {
+      return res.status(400).json({ error: 'Token and new password are required' });
     }
 
     const resetToken = await prisma.passwordResetToken.findUnique({
@@ -209,16 +207,6 @@ router.post('/reset-password', async (req, res) => {
 
     if (!resetToken || resetToken.usedAt || resetToken.expiresAt < new Date()) {
       return res.status(400).json({ error: 'This reset link is invalid or has expired' });
-    }
-
-    // Verify current/temporary password
-    const valid = await comparePassword(currentPassword, resetToken.user.password);
-    if (!valid) {
-      return res.status(400).json({ error: 'Current/temporary password is incorrect' });
-    }
-
-    if (currentPassword === password) {
-      return res.status(400).json({ error: 'New password must be different from current password' });
     }
 
     const strengthError = validatePasswordStrength(password);

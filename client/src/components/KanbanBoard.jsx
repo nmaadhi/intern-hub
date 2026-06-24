@@ -30,7 +30,7 @@ function StoryPointsBadge({ points }) {
   );
 }
 
-function KanbanCard({ task, role, onBlock, onDelete, overlay = false, readOnly = false }) {
+function KanbanCard({ task, role, userId, onBlock, onDelete, onEdit, onWriteCode, overlay = false, readOnly = false }) {
   const canDrag = !readOnly && !task.blocked;
 
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
@@ -43,12 +43,16 @@ function KanbanCard({ task, role, onBlock, onDelete, overlay = false, readOnly =
     ? { transform: `translate(${transform.x}px, ${transform.y}px)` }
     : undefined;
 
+  const isMyTask = task.assignedToId === userId;
+  const isCodeTask = task.isCodeTask;
+  const alreadyPassed = task.codeSubmissions?.[0]?.passed;
+
   return (
     <div
       ref={setNodeRef}
       style={style}
       className={`bg-white rounded-xl shadow-sm border
-        ${task.blocked ? 'border-red-300 bg-red-50' : 'border-gray-200'}
+        ${task.blocked ? 'border-red-300 bg-red-50' : isCodeTask ? 'border-purple-200' : 'border-gray-200'}
         ${isDragging && !overlay ? 'opacity-40' : ''}
         ${overlay ? 'shadow-xl rotate-1' : ''}
       `}
@@ -61,6 +65,12 @@ function KanbanCard({ task, role, onBlock, onDelete, overlay = false, readOnly =
       >
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
+            {/* Code task badge */}
+            {isCodeTask && (
+              <span className="inline-block text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-medium mb-1">
+                💻 {task.codeLanguage || 'code'}
+              </span>
+            )}
             <p className="text-sm font-medium text-gray-800 leading-tight">{task.title}</p>
             {task.description && (
               <p className="text-xs text-gray-500 mt-1 line-clamp-2">{task.description}</p>
@@ -72,15 +82,25 @@ function KanbanCard({ task, role, onBlock, onDelete, overlay = false, readOnly =
               {task.blocked && (
                 <span className="text-xs bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-medium">🚫 Blocked</span>
               )}
+              {alreadyPassed && (
+                <span className="text-xs bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-medium">✅ AI Approved</span>
+              )}
             </div>
           </div>
           <StoryPointsBadge points={task.storyPoints || 0} />
         </div>
       </div>
 
-      {/* Buttons - outside drag zone, always clickable */}
+      {/* Mentor buttons */}
       {role === 'MENTOR' && !overlay && !readOnly && (
-        <div className="flex gap-2 px-3 pb-3 border-t border-gray-100 pt-2">
+        <div className="flex gap-2 px-3 pb-3 border-t border-gray-100 pt-2 flex-wrap">
+          <button
+            type="button"
+            onClick={() => onEdit && onEdit(task)}
+            className="text-xs px-3 py-1 rounded-lg font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 transition"
+          >
+            ✏️ Edit
+          </button>
           <button
             type="button"
             onClick={() => onBlock(task.id)}
@@ -101,11 +121,24 @@ function KanbanCard({ task, role, onBlock, onDelete, overlay = false, readOnly =
           </button>
         </div>
       )}
+
+      {/* Intern buttons — show Write Code on code tasks */}
+      {role === 'INTERN' && !overlay && !readOnly && isMyTask && isCodeTask && task.status !== 'DONE' && (
+        <div className="px-3 pb-3 border-t border-gray-100 pt-2">
+          <button
+            type="button"
+            onClick={() => onWriteCode && onWriteCode(task)}
+            className="w-full text-xs bg-purple-600 text-white px-3 py-1.5 rounded-lg hover:bg-purple-700 transition font-medium"
+          >
+            {alreadyPassed ? '✅ Already Passed' : task.codeSubmissions?.[0] ? '🔄 Resubmit Code' : '✏️ Write Code'}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
 
-function KanbanColumn({ col, tasks, role, onBlock, onDelete, readOnly }) {
+function KanbanColumn({ col, tasks, role, userId, onBlock, onDelete, onEdit, onWriteCode, readOnly }) {
   const { setNodeRef, isOver } = useDroppable({ id: col.id });
   const totalPoints = tasks.reduce((sum, t) => sum + (t.storyPoints || 0), 0);
 
@@ -132,8 +165,11 @@ function KanbanColumn({ col, tasks, role, onBlock, onDelete, readOnly }) {
             key={task.id}
             task={task}
             role={role}
+            userId={userId}
             onBlock={onBlock}
             onDelete={onDelete}
+            onEdit={onEdit}
+            onWriteCode={onWriteCode}
             readOnly={readOnly}
           />
         ))}
@@ -147,18 +183,12 @@ function KanbanColumn({ col, tasks, role, onBlock, onDelete, readOnly }) {
   );
 }
 
-export default function KanbanBoard({ board, role, userId, onTaskMove, onTaskBlock, onTaskDelete, readOnly = false }) {
+export default function KanbanBoard({ board, role, userId, onTaskMove, onTaskBlock, onTaskDelete, onTaskEdit, onTaskWriteCode, readOnly = false }) {
   const [activeTask, setActiveTask] = useState(null);
 
-  // MouseSensor + TouchSensor instead of PointerSensor
-  // These respect button clicks and don't swallow them
   const sensors = useSensors(
-    useSensor(MouseSensor, {
-      activationConstraint: { distance: 10 },
-    }),
-    useSensor(TouchSensor, {
-      activationConstraint: { delay: 200, tolerance: 8 },
-    })
+    useSensor(MouseSensor, { activationConstraint: { distance: 10 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } })
   );
 
   const handleDragStart = ({ active }) => {
@@ -178,11 +208,8 @@ export default function KanbanBoard({ board, role, userId, onTaskMove, onTaskBlo
 
   const handleDragCancel = () => setActiveTask(null);
 
-  const totalPoints = Object.values(board.columns)
-    .flat()
-    .reduce((sum, t) => sum + (t.storyPoints || 0), 0);
-  const donePoints = (board.columns.DONE || [])
-    .reduce((sum, t) => sum + (t.storyPoints || 0), 0);
+  const totalPoints = Object.values(board.columns).flat().reduce((sum, t) => sum + (t.storyPoints || 0), 0);
+  const donePoints = (board.columns.DONE || []).reduce((sum, t) => sum + (t.storyPoints || 0), 0);
 
   return (
     <div className="space-y-4">
@@ -213,8 +240,11 @@ export default function KanbanBoard({ board, role, userId, onTaskMove, onTaskBlo
               col={col}
               tasks={board.columns[col.id] || []}
               role={role}
+              userId={userId}
               onBlock={onTaskBlock}
               onDelete={onTaskDelete}
+              onEdit={onTaskEdit}
+              onWriteCode={onTaskWriteCode}
               readOnly={readOnly}
             />
           ))}
@@ -225,6 +255,7 @@ export default function KanbanBoard({ board, role, userId, onTaskMove, onTaskBlo
             <KanbanCard
               task={activeTask}
               role={role}
+              userId={userId}
               onBlock={() => {}}
               onDelete={() => {}}
               overlay
