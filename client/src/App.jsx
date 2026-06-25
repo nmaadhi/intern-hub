@@ -12,6 +12,7 @@ const NotFound = lazy(() => import('./pages/NotFound'));
 const ChangePassword = lazy(() => import('./pages/ChangePassword'));
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
+const Chat = lazy(() => import('./pages/Chat'));
 
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
 const ManageMentors = lazy(() => import('./pages/admin/ManageMentors'));
@@ -77,6 +78,7 @@ function App() {
             <Route path="cohorts" element={<ManageCohorts />} />
             <Route path="interns" element={<ManageInterns />} />
             <Route path="sprints" element={<ManageSprints />} />
+            <Route path="chat" element={<Chat />} />
           </Route>
         </Route>
 
@@ -94,6 +96,7 @@ function App() {
             <Route path="polls" element={<Polls />} />
             <Route path="announcements" element={<Announcements />} />
             <Route path="quiz" element={<MentorQuiz />} />
+            <Route path="chat" element={<Chat />} />
           </Route>
         </Route>
 
@@ -112,6 +115,7 @@ function App() {
             <Route path="announcements" element={<InternAnnouncements />} />
             <Route path="quizzes" element={<Quizzes />} />
             <Route path="quizzes/:id" element={<TakeQuiz />} />
+            <Route path="chat" element={<Chat />} />
           </Route>
         </Route>
 
