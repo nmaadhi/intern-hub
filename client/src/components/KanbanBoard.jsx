@@ -11,27 +11,21 @@ const COLUMNS = [
   { id: 'DONE', label: 'Done', color: 'border-emerald-400', bg: 'bg-emerald-50' },
 ];
 
-const POINT_COLORS = {
-  0: 'bg-gray-100 text-gray-400',
-  1: 'bg-emerald-100 text-emerald-700',
-  2: 'bg-emerald-100 text-emerald-700',
-  3: 'bg-blue-100 text-blue-700',
-  5: 'bg-blue-100 text-blue-700',
-  8: 'bg-orange-100 text-orange-700',
-  13: 'bg-red-100 text-red-700',
-};
-
 function StoryPointsBadge({ points }) {
-  if (!points) return null;
+  if (points === undefined || points === null) return null;
   return (
-    <span className={`shrink-0 text-xs font-bold px-1.5 py-0.5 rounded ${POINT_COLORS[points] || 'bg-gray-100 text-gray-500'}`}>
-      {points}
+    <span className="shrink-0 text-xs font-bold px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">
+      {points}pts
     </span>
   );
 }
 
-function KanbanCard({ task, role, userId, onBlock, onDelete, onEdit, onWriteCode, overlay = false, readOnly = false }) {
-  const canDrag = !readOnly && !task.blocked;
+function KanbanCard({
+  task, role, userId, onBlock, onDelete, onEdit,
+  onWriteCode, onApprove, onReject,
+  overlay = false, readOnly = false,
+}) {
+  const canDrag = !readOnly && !task.blocked && role !== 'INTERN';
 
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: task.id,
@@ -45,19 +39,27 @@ function KanbanCard({ task, role, userId, onBlock, onDelete, onEdit, onWriteCode
 
   const isMyTask = task.assignedToId === userId;
   const isCodeTask = task.isCodeTask;
-  const alreadyPassed = task.codeSubmissions?.[0]?.passed;
+  const aiPassed = task.codeSubmissions?.[0]?.passed;
+
+  // ✅ Write Code only shows for intern when IN_PROGRESS
+  const showWriteCode = role === 'INTERN' && !overlay && !readOnly
+    && isMyTask && isCodeTask && task.status === 'IN_PROGRESS';
+
+  // ✅ Approve/Reject only shows for mentor on code tasks in REVIEW
+  const showApproveReject = role === 'MENTOR' && !overlay && !readOnly
+    && isCodeTask && task.status === 'REVIEW';
 
   return (
     <div
       ref={setNodeRef}
       style={style}
-      className={`bg-white rounded-xl shadow-sm border
+      className={`bg-white rounded-xl shadow-sm border transition
         ${task.blocked ? 'border-red-300 bg-red-50' : isCodeTask ? 'border-purple-200' : 'border-gray-200'}
         ${isDragging && !overlay ? 'opacity-40' : ''}
         ${overlay ? 'shadow-xl rotate-1' : ''}
       `}
     >
-      {/* Drag zone */}
+      {/* Drag handle + content */}
       <div
         {...(canDrag ? listeners : {})}
         {...(canDrag ? attributes : {})}
@@ -65,7 +67,6 @@ function KanbanCard({ task, role, userId, onBlock, onDelete, onEdit, onWriteCode
       >
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
-            {/* Code task badge */}
             {isCodeTask && (
               <span className="inline-block text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-medium mb-1">
                 💻 {task.codeLanguage || 'code'}
@@ -82,17 +83,48 @@ function KanbanCard({ task, role, userId, onBlock, onDelete, onEdit, onWriteCode
               {task.blocked && (
                 <span className="text-xs bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-medium">🚫 Blocked</span>
               )}
-              {alreadyPassed && (
-                <span className="text-xs bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-medium">✅ AI Approved</span>
+              {/* ✅ Show AI Approved badge when in REVIEW */}
+              {isCodeTask && task.status === 'REVIEW' && aiPassed && (
+                <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">
+                  ⏳ AI Approved — Awaiting mentor
+                </span>
+              )}
+              {isCodeTask && task.status === 'DONE' && (
+                <span className="text-xs bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-medium">
+                  ✅ Mentor Approved
+                </span>
               )}
             </div>
           </div>
-          <StoryPointsBadge points={task.storyPoints || 0} />
+          <StoryPointsBadge points={task.storyPoints} />
         </div>
       </div>
 
-      {/* Mentor buttons */}
-      {role === 'MENTOR' && !overlay && !readOnly && (
+      {/* ✅ MENTOR: Approve/Reject buttons for code tasks in REVIEW */}
+      {showApproveReject && (
+        <div className="px-3 pb-3 border-t border-amber-100 pt-2 space-y-2">
+          <p className="text-xs text-amber-700 font-medium">AI approved this code — your decision:</p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => onApprove && onApprove(task.id)}
+              className="flex-1 text-xs bg-emerald-600 text-white px-3 py-1.5 rounded-lg hover:bg-emerald-700 transition font-medium"
+            >
+              ✅ Approve → Done
+            </button>
+            <button
+              type="button"
+              onClick={() => onReject && onReject(task.id)}
+              className="flex-1 text-xs bg-red-500 text-white px-3 py-1.5 rounded-lg hover:bg-red-600 transition font-medium"
+            >
+              ❌ Reject → Redo
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* MENTOR: Edit / Block / Delete for non-REVIEW code tasks and all non-code tasks */}
+      {role === 'MENTOR' && !overlay && !readOnly && !showApproveReject && (
         <div className="flex gap-2 px-3 pb-3 border-t border-gray-100 pt-2 flex-wrap">
           <button
             type="button"
@@ -104,11 +136,11 @@ function KanbanCard({ task, role, userId, onBlock, onDelete, onEdit, onWriteCode
           <button
             type="button"
             onClick={() => onBlock(task.id)}
-            className={`text-xs px-3 py-1 rounded-lg font-medium transition
-              ${task.blocked
+            className={`text-xs px-3 py-1 rounded-lg font-medium transition ${
+              task.blocked
                 ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
                 : 'bg-red-50 text-red-500 hover:bg-red-100'
-              }`}
+            }`}
           >
             {task.blocked ? 'Unblock' : 'Block'}
           </button>
@@ -122,23 +154,48 @@ function KanbanCard({ task, role, userId, onBlock, onDelete, onEdit, onWriteCode
         </div>
       )}
 
-      {/* Intern buttons — show Write Code on code tasks */}
-      {role === 'INTERN' && !overlay && !readOnly && isMyTask && isCodeTask && task.status !== 'DONE' && (
+      {/* MENTOR: Show Edit button even on REVIEW code tasks (with warning in modal) */}
+      {role === 'MENTOR' && !overlay && !readOnly && showApproveReject && (
+        <div className="px-3 pb-3">
+          <button
+            type="button"
+            onClick={() => onEdit && onEdit(task)}
+            className="text-xs px-3 py-1 rounded-lg font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 transition"
+          >
+            ✏️ Edit (resets to In Progress)
+          </button>
+        </div>
+      )}
+
+      {/* ✅ INTERN: Write Code — only when IN_PROGRESS */}
+      {showWriteCode && (
         <div className="px-3 pb-3 border-t border-gray-100 pt-2">
           <button
             type="button"
             onClick={() => onWriteCode && onWriteCode(task)}
             className="w-full text-xs bg-purple-600 text-white px-3 py-1.5 rounded-lg hover:bg-purple-700 transition font-medium"
           >
-            {alreadyPassed ? '✅ Already Passed' : task.codeSubmissions?.[0] ? '🔄 Resubmit Code' : '✏️ Write Code'}
+            {task.codeSubmissions?.[0] ? '🔄 Resubmit Code' : '✏️ Write Code'}
           </button>
+        </div>
+      )}
+
+      {/* INTERN: Show waiting message when in REVIEW */}
+      {role === 'INTERN' && !overlay && !readOnly && isMyTask && isCodeTask && task.status === 'REVIEW' && (
+        <div className="px-3 pb-3 border-t border-amber-100 pt-2">
+          <p className="text-xs text-amber-700 text-center font-medium">
+            ⏳ AI approved — waiting for mentor to approve
+          </p>
         </div>
       )}
     </div>
   );
 }
 
-function KanbanColumn({ col, tasks, role, userId, onBlock, onDelete, onEdit, onWriteCode, readOnly }) {
+function KanbanColumn({
+  col, tasks, role, userId, onBlock, onDelete, onEdit,
+  onWriteCode, onApprove, onReject, readOnly,
+}) {
   const { setNodeRef, isOver } = useDroppable({ id: col.id });
   const totalPoints = tasks.reduce((sum, t) => sum + (t.storyPoints || 0), 0);
 
@@ -170,6 +227,8 @@ function KanbanColumn({ col, tasks, role, userId, onBlock, onDelete, onEdit, onW
             onDelete={onDelete}
             onEdit={onEdit}
             onWriteCode={onWriteCode}
+            onApprove={onApprove}
+            onReject={onReject}
             readOnly={readOnly}
           />
         ))}
@@ -183,7 +242,13 @@ function KanbanColumn({ col, tasks, role, userId, onBlock, onDelete, onEdit, onW
   );
 }
 
-export default function KanbanBoard({ board, role, userId, onTaskMove, onTaskBlock, onTaskDelete, onTaskEdit, onTaskWriteCode, readOnly = false }) {
+export default function KanbanBoard({
+  board, role, userId,
+  onTaskMove, onTaskBlock, onTaskDelete,
+  onTaskEdit, onTaskWriteCode,
+  onTaskApprove, onTaskReject,
+  readOnly = false,
+}) {
   const [activeTask, setActiveTask] = useState(null);
 
   const sensors = useSensors(
@@ -245,6 +310,8 @@ export default function KanbanBoard({ board, role, userId, onTaskMove, onTaskBlo
               onDelete={onTaskDelete}
               onEdit={onTaskEdit}
               onWriteCode={onTaskWriteCode}
+              onApprove={onTaskApprove}
+              onReject={onTaskReject}
               readOnly={readOnly}
             />
           ))}

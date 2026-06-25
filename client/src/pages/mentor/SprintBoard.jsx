@@ -19,9 +19,9 @@ const LANGUAGES = [
 
 const PHASE_CONFIG = {
   PLANNING: { label: 'Planning', color: 'bg-amber-100 text-amber-700', icon: '📋', next: 'ACTIVE', nextLabel: '🚀 Start Sprint', nextColor: 'bg-blue-600 hover:bg-blue-700' },
-  ACTIVE: { label: 'Active', color: 'bg-blue-100 text-blue-700', icon: '🏃', next: 'REVIEW', nextLabel: '🔍 Move to Review', nextColor: 'bg-purple-600 hover:bg-purple-700' },
-  REVIEW: { label: 'Review', color: 'bg-purple-100 text-purple-700', icon: '🔍', next: 'COMPLETED', nextLabel: '✅ Complete Sprint', nextColor: 'bg-emerald-600 hover:bg-emerald-700' },
-  COMPLETED: { label: 'Completed', color: 'bg-emerald-100 text-emerald-700', icon: '✅', next: null, nextLabel: null },
+  ACTIVE:   { label: 'Active',   color: 'bg-blue-100 text-blue-700',   icon: '🏃', next: 'REVIEW',  nextLabel: '🔍 Move to Review', nextColor: 'bg-purple-600 hover:bg-purple-700' },
+  REVIEW:   { label: 'Review',   color: 'bg-purple-100 text-purple-700', icon: '🔍', next: 'COMPLETED', nextLabel: '✅ Complete Sprint', nextColor: 'bg-emerald-600 hover:bg-emerald-700' },
+  COMPLETED:{ label: 'Completed',color: 'bg-emerald-100 text-emerald-700', icon: '✅', next: null, nextLabel: null },
 };
 
 // ── Add Card Form ─────────────────────────────────────────────────
@@ -67,7 +67,7 @@ function AddCardForm({ interns, onAdd, onCancel }) {
         </label>
         <textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={isCodeTask ? 3 : 2}
           className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white resize-none"
-          placeholder={isCodeTask ? 'e.g. Write a Python function that adds two numbers and prints the result.' : 'Any extra context...'} />
+          placeholder={isCodeTask ? 'e.g. Write a function that adds two numbers and prints the result.' : 'Any extra context...'} />
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
@@ -79,12 +79,11 @@ function AddCardForm({ interns, onAdd, onCancel }) {
           </select>
         </div>
         <div>
-          {/* ✅ Free number input for story points */}
+          {/* ✅ Free number input */}
           <label className="block text-xs font-semibold text-gray-600 mb-1">Story Points</label>
           <input
-            type="number" value={points}
+            type="number" value={points} min={0}
             onChange={(e) => setPoints(Math.max(0, parseInt(e.target.value) || 0))}
-            min={0}
             className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
             placeholder="e.g. 5"
           />
@@ -159,10 +158,11 @@ function EditCardModal({ task, interns, onSave, onClose }) {
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
         </div>
         <div className="p-6 space-y-4">
-          {/* ✅ Warning if editing a passed code task */}
+          {/* ✅ Warning if card will be reset */}
           {willReset && (
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-700">
-              ⚠️ This card was already AI-approved. Editing it will reset it to <strong>In Progress</strong> and the intern will need to resubmit code.
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800">
+              ⚠️ This is an AI-approved code card. Saving will reset it to <strong>In Progress</strong>.
+              The intern will need to resubmit. Previous submissions are kept for reference.
             </div>
           )}
           <div>
@@ -172,7 +172,7 @@ function EditCardModal({ task, interns, onSave, onClose }) {
           </div>
           <div>
             <label className="block text-xs font-semibold text-gray-600 mb-1">
-              Description {isCodeTask && <span className="text-purple-600">(AI uses this to evaluate code)</span>}
+              Description {isCodeTask && <span className="text-purple-600">(AI uses this to evaluate)</span>}
             </label>
             <textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={isCodeTask ? 3 : 2}
               className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
@@ -189,13 +189,10 @@ function EditCardModal({ task, interns, onSave, onClose }) {
           <div>
             {/* ✅ Free number input */}
             <label className="block text-xs font-semibold text-gray-600 mb-1">Story Points</label>
-            <input
-              type="number" value={points}
+            <input type="number" value={points} min={0}
               onChange={(e) => setPoints(Math.max(0, parseInt(e.target.value) || 0))}
-              min={0}
               className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-              placeholder="e.g. 5"
-            />
+              placeholder="e.g. 5" />
           </div>
           <div className="flex items-center gap-3 p-3 bg-purple-50 border border-purple-100 rounded-xl">
             <input type="checkbox" id="editIsCodeTask" checked={isCodeTask}
@@ -244,8 +241,7 @@ function HowToUse() {
           <div>
             <p className="font-bold text-amber-600 mb-2">📋 PLANNING Phase</p>
             <ul className="space-y-1 text-gray-600 text-xs">
-              <li>→ Set sprint capacity</li>
-              <li>→ Add cards, set any story points</li>
+              <li>→ Add cards with any story point value</li>
               <li>→ Toggle 💻 Code Task for coding challenges</li>
               <li>→ Write clear description — AI uses it to evaluate</li>
               <li>→ Click 🚀 Start Sprint when ready</li>
@@ -254,10 +250,10 @@ function HowToUse() {
           <div>
             <p className="font-bold text-blue-600 mb-2">🏃 ACTIVE Phase</p>
             <ul className="space-y-1 text-gray-600 text-xs">
-              <li>→ Add/edit cards anytime</li>
-              <li>→ 💻 Code tasks: intern submits → AI approves → moves to Review</li>
-              <li>→ You drag from Review → Done to approve</li>
-              <li>→ Editing an approved card resets it to In Progress</li>
+              <li>→ Drag cards between columns</li>
+              <li>→ 💻 Code tasks: intern submits → AI reviews → PASSED = goes to Review</li>
+              <li>→ Review column shows AI-approved code waiting for your decision</li>
+              <li>→ Click ✅ Approve → Done or ❌ Reject → Redo</li>
             </ul>
           </div>
           <div>
@@ -265,8 +261,9 @@ function HowToUse() {
             <ul className="space-y-1 text-gray-600 text-xs">
               <li>→ Intern writes code → AI reviews</li>
               <li>→ PASSED → moves to Review column</li>
-              <li>→ You drag to Done to finalize ✅</li>
-              <li>→ FAILED → intern fixes and resubmits</li>
+              <li>→ You see Approve / Reject buttons</li>
+              <li>→ Approve → Done ✅ · Reject → intern redoes</li>
+              <li>→ Editing an approved card resets to In Progress</li>
             </ul>
           </div>
           <div>
@@ -298,7 +295,6 @@ function PlanningPhase({ sprint, interns, onAddTask, onDeleteTask, onUpdatePoint
       {editingTask && (
         <EditCardModal task={editingTask} interns={interns} onSave={onEditTask} onClose={() => setEditingTask(null)} />
       )}
-
       <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-5">
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div>
@@ -340,13 +336,11 @@ function PlanningPhase({ sprint, interns, onAddTask, onDeleteTask, onUpdatePoint
             {showAddForm ? 'Cancel' : '+ Add Card'}
           </button>
         </div>
-
         {showAddForm && (
           <div className="mb-4">
             <AddCardForm interns={interns} onAdd={onAddTask} onCancel={() => setShowAddForm(false)} />
           </div>
         )}
-
         {allTasks.length === 0 ? (
           <div className="text-center py-8 text-gray-400">
             <p className="text-3xl mb-2">📋</p>
@@ -371,12 +365,10 @@ function PlanningPhase({ sprint, interns, onAddTask, onDeleteTask, onUpdatePoint
                   </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  {/* ✅ Free number input inline */}
+                  {/* ✅ Free number input per card */}
                   <input
-                    type="number"
-                    value={task.storyPoints || 0}
+                    type="number" value={task.storyPoints || 0} min={0}
                     onChange={(e) => onUpdatePoints(task.id, Math.max(0, parseInt(e.target.value) || 0))}
-                    min={0}
                     className="w-16 text-xs px-2 py-1 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-purple-500 text-center"
                   />
                   <button onClick={() => setEditingTask(task)}
@@ -394,15 +386,28 @@ function PlanningPhase({ sprint, interns, onAddTask, onDeleteTask, onUpdatePoint
 }
 
 // ── Active Phase ──────────────────────────────────────────────────
-function ActivePhase({ sprint, board, burndown, interns, userId, onTaskMove, onTaskBlock, onMoveToReview, cohortId, onAddTask, onEditTask }) {
+function ActivePhase({ sprint, board, burndown, interns, userId, onTaskMove, onTaskBlock, onMoveToReview, cohortId, onAddTask, onEditTask, onTaskApprove, onTaskReject }) {
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
   const daysRemaining = Math.max(0, Math.ceil((new Date(sprint.endDate) - new Date()) / 86400000));
+
+  // Count code tasks waiting for approval in REVIEW
+  const pendingApprovals = board ? (board.columns.REVIEW || []).filter(t => t.isCodeTask && t.codeSubmissions?.[0]?.passed).length : 0;
 
   return (
     <div className="space-y-5">
       {editingTask && (
         <EditCardModal task={editingTask} interns={interns} onSave={onEditTask} onClose={() => setEditingTask(null)} />
+      )}
+
+      {/* ✅ Alert if there are cards waiting for approval */}
+      {pendingApprovals > 0 && (
+        <div className="bg-amber-50 border border-amber-300 rounded-xl px-4 py-3 flex items-center gap-3">
+          <span className="text-xl">⏳</span>
+          <p className="text-sm text-amber-800 font-medium">
+            {pendingApprovals} code card{pendingApprovals > 1 ? 's' : ''} waiting for your approval in the Review column.
+          </p>
+        </div>
       )}
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -443,7 +448,9 @@ function ActivePhase({ sprint, board, burndown, interns, userId, onTaskMove, onT
 
         {showAddForm && (
           <div className="mb-5">
-            <AddCardForm interns={interns} onAdd={async (data) => { await onAddTask(data); setShowAddForm(false); }} onCancel={() => setShowAddForm(false)} />
+            <AddCardForm interns={interns}
+              onAdd={async (data) => { await onAddTask(data); setShowAddForm(false); }}
+              onCancel={() => setShowAddForm(false)} />
           </div>
         )}
 
@@ -451,13 +458,16 @@ function ActivePhase({ sprint, board, burndown, interns, userId, onTaskMove, onT
           <p className="text-sm text-blue-700 bg-blue-50 px-3 py-2 rounded-lg mb-4">🎯 {sprint.goal}</p>
         )}
 
-        <p className="text-xs text-gray-400 mb-3">💡 Click ✏️ Edit on any card · Cards in Review = AI approved, drag to Done to finalize · 💻 = Code Task</p>
+        <p className="text-xs text-gray-400 mb-3">
+          💡 Review column = AI-approved code waiting for your ✅ Approve or ❌ Reject · Drag other cards between columns
+        </p>
 
         {board && (
           <KanbanBoard
             board={board} role="MENTOR" userId={userId}
             onTaskMove={onTaskMove} onTaskBlock={onTaskBlock}
             onTaskDelete={() => {}} onTaskEdit={(task) => setEditingTask(task)}
+            onTaskApprove={onTaskApprove} onTaskReject={onTaskReject}
           />
         )}
       </div>
@@ -652,14 +662,12 @@ export default function SprintBoard() {
         });
       }, 500);
     };
-
     const onTaskCreated = ({ task }) => {
       setBoard((prev) => {
         if (!prev) return prev;
         return { ...prev, columns: { ...prev.columns, TODO: [...prev.columns.TODO, task] } };
       });
     };
-
     const onTaskDeleted = ({ taskId }) => {
       setBoard((prev) => {
         if (!prev) return prev;
@@ -668,7 +676,6 @@ export default function SprintBoard() {
         return { ...prev, columns: newCols };
       });
     };
-
     const onTaskBlocked = ({ taskId, blocked }) => {
       setBoard((prev) => {
         if (!prev) return prev;
@@ -677,7 +684,6 @@ export default function SprintBoard() {
         return { ...prev, columns: newCols };
       });
     };
-
     const onTaskEdited = ({ task }) => {
       setBoard((prev) => {
         if (!prev) return prev;
@@ -686,7 +692,6 @@ export default function SprintBoard() {
         return { ...prev, columns: newCols };
       });
     };
-
     const onTaskPointsUpdated = ({ taskId, storyPoints }) => {
       setBoard((prev) => {
         if (!prev) return prev;
@@ -695,19 +700,13 @@ export default function SprintBoard() {
         return { ...prev, columns: newCols };
       });
     };
-
     const onPhaseChanged = ({ phase, velocity }) => {
       setSprint((prev) => prev ? { ...prev, phase, velocity } : prev);
       loadBoard();
     };
-
     const onSprintDeleted = ({ sprintId }) => {
       setSprints((prev) => prev.filter((s) => s.id !== sprintId));
-      if (selectedSprintId === sprintId) {
-        setSelectedSprintId('');
-        setSprint(null);
-        setBoard(null);
-      }
+      if (selectedSprintId === sprintId) { setSelectedSprintId(''); setSprint(null); setBoard(null); }
     };
 
     socket.on('task:moved', onTaskMoved);
@@ -770,13 +769,11 @@ export default function SprintBoard() {
   };
 
   const handleDeleteSprint = async () => {
-    if (!window.confirm(`Delete sprint "${sprint.name}"? This will remove all cards and data. This cannot be undone.`)) return;
+    if (!window.confirm(`Delete sprint "${sprint.name}"? This cannot be undone.`)) return;
     try {
       await api.delete(`/sprint/sprints/${selectedSprintId}`);
       setSprints((prev) => prev.filter((s) => s.id !== selectedSprintId));
-      setSelectedSprintId('');
-      setSprint(null);
-      setBoard(null);
+      setSelectedSprintId(''); setSprint(null); setBoard(null);
     } catch (err) {
       alert(err.response?.data?.error || 'Failed to delete sprint');
     }
@@ -829,6 +826,25 @@ export default function SprintBoard() {
 
   const handleSaveReview = async (reviewNotes) => {
     await api.patch(`/sprint/sprints/${selectedSprintId}/review`, { reviewNotes });
+  };
+
+  // ✅ Approve handler
+  const handleTaskApprove = async (taskId) => {
+    try {
+      await api.patch(`/sprint/tasks/${taskId}/approve`, { action: 'approve' });
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to approve');
+    }
+  };
+
+  // ✅ Reject handler
+  const handleTaskReject = async (taskId) => {
+    if (!window.confirm('Reject this code? The intern will need to resubmit.')) return;
+    try {
+      await api.patch(`/sprint/tasks/${taskId}/approve`, { action: 'reject' });
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to reject');
+    }
   };
 
   const fmtDate = (s) => s ? new Date(s).toLocaleDateString([], { dateStyle: 'medium' }) : '';
@@ -960,7 +976,8 @@ export default function SprintBoard() {
         <ActivePhase sprint={sprint} board={board} burndown={burndown} interns={interns}
           userId={user?.id} onTaskMove={handleTaskMove} onTaskBlock={handleTaskBlock}
           onMoveToReview={() => handlePhaseTransition('REVIEW')}
-          cohortId={selectedCohortId} onAddTask={handleAddTask} onEditTask={handleEditTask} />
+          cohortId={selectedCohortId} onAddTask={handleAddTask} onEditTask={handleEditTask}
+          onTaskApprove={handleTaskApprove} onTaskReject={handleTaskReject} />
       ) : phase === 'REVIEW' ? (
         <ReviewPhase sprint={sprint} board={board} burndown={burndown}
           onSaveReview={handleSaveReview} onComplete={() => handlePhaseTransition('COMPLETED')} />

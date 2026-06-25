@@ -17,7 +17,7 @@ const PHASE_CONFIG = {
   ACTIVE: {
     icon: '🏃', label: 'Active',
     color: 'bg-blue-100 text-blue-700 border-blue-200',
-    message: 'Sprint is live! Drag your assigned cards to update their status.',
+    message: 'Sprint is live! Work on your assigned cards.',
     bgColor: 'bg-blue-50 border-blue-200', textColor: 'text-blue-800',
   },
   REVIEW: {
@@ -55,11 +55,11 @@ function HowToUse({ phase }) {
             <div className={`p-3 rounded-xl border ${phase === 'ACTIVE' ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-200'}`}>
               <p className="font-bold text-blue-600 mb-2">🏃 ACTIVE Phase</p>
               <ul className="space-y-1">
-                <li>→ Drag non-code cards to move between columns</li>
+                <li>→ Drag non-code cards between columns</li>
                 <li>→ 💻 Code tasks: click "✏️ Write Code"</li>
                 <li>→ AI PASSED → card moves to Review</li>
-                <li>→ Mentor approves → card moves to Done</li>
-                <li>→ Red cards are blocked — talk to mentor</li>
+                <li>→ Mentor approves → card moves to Done ✅</li>
+                <li>→ Mentor rejects → you redo and resubmit</li>
               </ul>
             </div>
             <div className={`p-3 rounded-xl border ${phase === 'REVIEW' ? 'bg-purple-50 border-purple-200' : 'bg-gray-50 border-gray-200'}`}>
@@ -79,7 +79,9 @@ function HowToUse({ phase }) {
           </div>
           <div className="bg-purple-50 border border-purple-200 rounded-xl p-3">
             <p className="font-bold text-purple-700 mb-1">💻 Code Task Flow</p>
-            <p>Click "✏️ Write Code" → Monaco editor opens → write solution → Submit → AI runs your code → PASSED = card moves to Review → mentor drags to Done ✅ · FAILED = fix and resubmit</p>
+            <p>Click "✏️ Write Code" → editor opens → write solution → Submit → AI reviews →
+              PASSED = card moves to Review (⏳ awaiting mentor) →
+              Mentor Approves = Done ✅ · Mentor Rejects = back to In Progress, fix and resubmit</p>
           </div>
         </div>
       )}
@@ -149,6 +151,7 @@ function ActiveView({ sprint, board, burndown, userId, cohortId, onTaskMove, onB
         ))}
       </div>
 
+      {/* My Cards */}
       {myTasks.length > 0 && (
         <div className="bg-white rounded-2xl shadow-sm p-5">
           <h3 className="font-bold text-gray-800 mb-3">My Cards ({myTasks.length})</h3>
@@ -156,6 +159,7 @@ function ActiveView({ sprint, board, burndown, userId, cohortId, onTaskMove, onB
             {myTasks.map((task) => (
               <div key={task.id} className={`flex items-center justify-between p-3 rounded-xl ${
                 task.blocked ? 'bg-red-50 border border-red-200' :
+                task.status === 'REVIEW' ? 'bg-amber-50 border border-amber-200' :
                 task.isCodeTask ? 'bg-purple-50 border border-purple-100' :
                 'bg-gray-50'
               }`}>
@@ -169,15 +173,17 @@ function ActiveView({ sprint, board, burndown, userId, cohortId, onTaskMove, onB
                     <p className="text-sm font-medium text-gray-800 truncate">{task.title}</p>
                   </div>
                   {task.blocked && <p className="text-xs text-red-600 mt-0.5">🚫 Blocked — talk to your mentor</p>}
-                  {/* ✅ Updated message for new flow */}
+                  {/* ✅ Status-specific messages */}
                   {task.isCodeTask && task.status === 'IN_PROGRESS' && (
-                    <p className="text-xs text-purple-600 mt-0.5">Write code → AI reviews → moves to Review → mentor approves → Done ✨</p>
+                    <p className="text-xs text-purple-600 mt-0.5">
+                      {task.codeSubmissions?.[0] ? '🔄 Rejected — fix and resubmit' : '✏️ Write your code and submit for AI review'}
+                    </p>
                   )}
                   {task.isCodeTask && task.status === 'REVIEW' && (
-                    <p className="text-xs text-amber-600 mt-0.5">⏳ AI approved — waiting for mentor to move to Done</p>
+                    <p className="text-xs text-amber-700 mt-0.5">⏳ AI approved — waiting for mentor to approve or reject</p>
                   )}
                   {task.status === 'DONE' && (
-                    <p className="text-xs text-emerald-600 mt-0.5">✅ Completed</p>
+                    <p className="text-xs text-emerald-600 mt-0.5">✅ Completed and approved by mentor</p>
                   )}
                 </div>
                 <div className="flex items-center gap-2 ml-2 shrink-0">
@@ -192,7 +198,7 @@ function ActiveView({ sprint, board, burndown, userId, cohortId, onTaskMove, onB
                   }`}>
                     {task.status.replace('_', ' ')}
                   </span>
-                  {/* ✅ Show Write Code only when IN_PROGRESS (not REVIEW or DONE) */}
+                  {/* ✅ Write Code only when IN_PROGRESS */}
                   {task.isCodeTask && task.status === 'IN_PROGRESS' && (
                     <button
                       onClick={() => setCodeTask(task)}
@@ -217,7 +223,7 @@ function ActiveView({ sprint, board, burndown, userId, cohortId, onTaskMove, onB
         <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
           <h3 className="font-bold text-gray-800">Sprint Board</h3>
           <div className="flex items-center gap-2">
-            <p className="text-xs text-gray-500">Drag cards · 💻 = code task · Review = AI approved, awaiting mentor</p>
+            <p className="text-xs text-gray-500">💻 = code task · Review = awaiting mentor approval</p>
             <ActivityFeed cohortId={cohortId} />
           </div>
         </div>
@@ -392,14 +398,12 @@ export default function InternSprintBoard() {
         }).catch(() => {});
       }, 600);
     };
-
     const onTaskCreated = ({ task }) => {
       setBoard((prev) => {
         if (!prev) return prev;
         return { ...prev, columns: { ...prev.columns, TODO: [...prev.columns.TODO, task] } };
       });
     };
-
     const onTaskDeleted = ({ taskId }) => {
       setBoard((prev) => {
         if (!prev) return prev;
@@ -408,7 +412,6 @@ export default function InternSprintBoard() {
         return { ...prev, columns: newCols };
       });
     };
-
     const onTaskBlocked = ({ taskId, blocked }) => {
       setBoard((prev) => {
         if (!prev) return prev;
@@ -417,7 +420,6 @@ export default function InternSprintBoard() {
         return { ...prev, columns: newCols };
       });
     };
-
     const onTaskEdited = ({ task }) => {
       setBoard((prev) => {
         if (!prev) return prev;
@@ -426,7 +428,6 @@ export default function InternSprintBoard() {
         return { ...prev, columns: newCols };
       });
     };
-
     const onTaskPointsUpdated = ({ taskId, storyPoints }) => {
       setBoard((prev) => {
         if (!prev) return prev;
@@ -435,7 +436,6 @@ export default function InternSprintBoard() {
         return { ...prev, columns: newCols };
       });
     };
-
     const onPhaseChanged = ({ phase, velocity }) => {
       setSprint((prev) => prev ? { ...prev, phase, velocity } : prev);
       loadBoard();
