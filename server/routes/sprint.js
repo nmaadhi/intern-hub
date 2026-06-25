@@ -306,7 +306,6 @@ router.patch('/sprints/:id/review', verifyToken, async (req, res) => {
   }
 });
 
-// DELETE /sprints/:id — mentor cancels/deletes a sprint
 router.delete('/sprints/:id', verifyToken, async (req, res) => {
   try {
     const { userId, role } = req.user;
@@ -315,13 +314,9 @@ router.delete('/sprints/:id', verifyToken, async (req, res) => {
       include: { cohort: { select: { id: true, mentorId: true } } },
     });
     if (!sprint) return res.status(404).json({ error: 'Sprint not found' });
-    if (role === 'MENTOR' && sprint.cohort.mentorId !== userId) {
-      return res.status(403).json({ error: 'You do not lead this cohort' });
-    }
+    if (role === 'MENTOR' && sprint.cohort.mentorId !== userId) return res.status(403).json({ error: 'You do not lead this cohort' });
     if (role === 'INTERN') return res.status(403).json({ error: 'Interns cannot delete sprints' });
-    if (sprint.phase === 'COMPLETED') {
-      return res.status(400).json({ error: 'Cannot delete a completed sprint' });
-    }
+    if (sprint.phase === 'COMPLETED') return res.status(400).json({ error: 'Cannot delete a completed sprint' });
     await prisma.sprint.delete({ where: { id: req.params.id } });
     const io = req.app.get('io');
     io.to(`cohort:${sprint.cohort.id}`).emit('sprint:deleted', { sprintId: sprint.id });
@@ -347,9 +342,10 @@ router.post('/sprints/:id/tasks', verifyToken, async (req, res) => {
     if (!sprint) return res.status(404).json({ error: 'Sprint not found' });
     if (!['PLANNING', 'ACTIVE'].includes(sprint.phase)) return res.status(400).json({ error: `Cannot add cards to a ${sprint.phase} sprint` });
     if (role === 'MENTOR' && sprint.cohort.mentorId !== userId) return res.status(403).json({ error: 'You do not lead this cohort' });
-    const validPoints = [0, 1, 2, 3, 5, 8, 13];
-    const points = storyPoints !== undefined ? parseInt(storyPoints) : 0;
-    if (!validPoints.includes(points)) return res.status(400).json({ error: 'Story points must be 0, 1, 2, 3, 5, 8, or 13' });
+
+    // ✅ Allow any non-negative integer for story points
+    const points = storyPoints !== undefined ? Math.max(0, parseInt(storyPoints) || 0) : 0;
+
     if (assignedToId) {
       const intern = await prisma.user.findUnique({ where: { id: assignedToId } });
       if (!intern) return res.status(404).json({ error: 'Intern not found' });
@@ -396,15 +392,12 @@ router.patch('/tasks/:id/move', verifyToken, async (req, res) => {
     const task = await prisma.sprintTask.findUnique({ where: { id: req.params.id }, include: { sprint: { include: { cohort: true } } } });
     if (!task) return res.status(404).json({ error: 'Card not found' });
     if (task.sprint.phase !== 'ACTIVE') return res.status(400).json({ error: `Cannot move cards — sprint is in ${task.sprint.phase} phase` });
-    if (task.isCodeTask && status === 'DONE') {
-      const latestSubmission = await prisma.codeSubmission.findFirst({
-        where: { taskId: task.id, internId: req.user.userId },
-        orderBy: { createdAt: 'desc' },
-      });
-      if (!latestSubmission?.passed && req.user.role === 'INTERN') {
-        return res.status(403).json({ error: 'Submit your code first. AI must approve before this card moves to Done.' });
-      }
+
+    // ✅ Code task: intern can only move to DONE if AI passed AND mentor approved (already in REVIEW)
+    if (task.isCodeTask && status === 'DONE' && req.user.role === 'INTERN') {
+      return res.status(403).json({ error: 'Your code is in Review. Wait for mentor to approve it.' });
     }
+
     const isMentor = task.sprint.createdById === req.user.userId || task.sprint.cohort.mentorId === req.user.userId;
     const isAssignedIntern = task.assignedToId === req.user.userId;
     const isAdmin = req.user.role === 'ADMIN';
@@ -434,9 +427,10 @@ router.patch('/tasks/:id/points', verifyToken, async (req, res) => {
   try {
     const { storyPoints } = req.body;
     const { userId, role } = req.user;
-    const validPoints = [0, 1, 2, 3, 5, 8, 13];
-    const points = parseInt(storyPoints);
-    if (!validPoints.includes(points)) return res.status(400).json({ error: 'Story points must be 0, 1, 2, 3, 5, 8, or 13' });
+
+    // ✅ Allow any non-negative integer
+    const points = Math.max(0, parseInt(storyPoints) || 0);
+
     const task = await prisma.sprintTask.findUnique({ where: { id: req.params.id }, include: { sprint: { include: { cohort: true } } } });
     if (!task) return res.status(404).json({ error: 'Card not found' });
     if (!['PLANNING', 'ACTIVE'].includes(task.sprint.phase)) return res.status(400).json({ error: 'Story points can only be changed during Planning or Active phase' });
@@ -459,23 +453,46 @@ router.patch('/tasks/:id/points', verifyToken, async (req, res) => {
 router.patch('/tasks/:id/edit', verifyToken, requireRole('MENTOR'), async (req, res) => {
   try {
     const { title, description, storyPoints, assignedToId, isCodeTask, codeLanguage } = req.body;
-    const task = await prisma.sprintTask.findUnique({ where: { id: req.params.id }, include: { sprint: { include: { cohort: true } } } });
+    const task = await prisma.sprintTask.findUnique({
+      where: { id: req.params.id },
+      include: { sprint: { include: { cohort: true } } },
+    });
     if (!task) return res.status(404).json({ error: 'Task not found' });
     if (task.sprint.cohort.mentorId !== req.user.userId) return res.status(403).json({ error: 'Not your sprint' });
+
+    const updateData = {
+      ...(title !== undefined && { title: title.trim() }),
+      ...(description !== undefined && { description: description?.trim() || null }),
+      ...(storyPoints !== undefined && { storyPoints: Math.max(0, parseInt(storyPoints) || 0) }),
+      ...(assignedToId !== undefined && { assignedToId: assignedToId || null }),
+      ...(isCodeTask !== undefined && { isCodeTask }),
+      ...(codeLanguage !== undefined && { codeLanguage }),
+    };
+
+    // ✅ If code task was DONE or REVIEW — reset to IN_PROGRESS and delete submissions
+    if (task.isCodeTask && (task.status === 'DONE' || task.status === 'REVIEW')) {
+      updateData.status = 'IN_PROGRESS';
+      await prisma.codeSubmission.deleteMany({ where: { taskId: task.id } });
+    }
+
     const updated = await prisma.sprintTask.update({
       where: { id: req.params.id },
-      data: {
-        ...(title !== undefined && { title: title.trim() }),
-        ...(description !== undefined && { description: description?.trim() || null }),
-        ...(storyPoints !== undefined && { storyPoints }),
-        ...(assignedToId !== undefined && { assignedToId: assignedToId || null }),
-        ...(isCodeTask !== undefined && { isCodeTask }),
-        ...(codeLanguage !== undefined && { codeLanguage }),
-      },
+      data: updateData,
       include: { assignedTo: { select: { id: true, name: true, internId: true } } },
     });
+
     const io = req.app.get('io');
     io.to(`cohort:${task.sprint.cohortId}`).emit('task:edited', { task: updated });
+
+    // Notify intern to resubmit
+    if (updateData.status === 'IN_PROGRESS' && updated.assignedToId) {
+      io.to(`cohort:${task.sprint.cohortId}`).emit('notification:new', {
+        type: 'TASK_ASSIGNED',
+        message: `🔄 Mentor updated "${updated.title}" — please resubmit your code.`,
+        targetUserId: updated.assignedToId,
+      });
+    }
+
     res.json({ task: updated });
   } catch (err) {
     console.error('💥 Error editing task:', err);
@@ -658,9 +675,10 @@ Be encouraging but honest. Respond with JSON only.`;
     });
 
     if (passed) {
+      // ✅ PASSED → move to REVIEW (not DONE) — mentor must approve to move to DONE
       const updatedTask = await prisma.sprintTask.update({
         where: { id: task.id },
-        data: { status: 'DONE' },
+        data: { status: 'REVIEW' },
         include: {
           assignedTo: { select: { id: true, name: true, internId: true } },
           createdBy: { select: { id: true, name: true } },
@@ -670,12 +688,12 @@ Be encouraging but honest. Respond with JSON only.`;
       await takeSnapshot(task.sprintId);
       const io = req.app.get('io');
       io.to(`cohort:${task.sprint.cohort.id}`).emit('task:moved', {
-        taskId: task.id, newStatus: 'DONE', oldStatus: task.status,
+        taskId: task.id, newStatus: 'REVIEW', oldStatus: task.status,
         task: updatedTask, movedBy: { id: req.user.userId, name: 'AI Review', role: 'SYSTEM' },
       });
       io.to(`cohort:${task.sprint.cohort.id}`).emit('notification:new', {
         type: 'SPRINT_PHASE',
-        message: `✅ AI approved ${updatedTask.assignedTo?.name}'s code for: ${task.title}`,
+        message: `✅ AI approved ${updatedTask.assignedTo?.name}'s code for "${task.title}" — please review and move to Done.`,
         targetUserId: null,
       });
     }

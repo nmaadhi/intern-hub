@@ -55,9 +55,10 @@ function HowToUse({ phase }) {
             <div className={`p-3 rounded-xl border ${phase === 'ACTIVE' ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-200'}`}>
               <p className="font-bold text-blue-600 mb-2">🏃 ACTIVE Phase</p>
               <ul className="space-y-1">
-                <li>→ Drag cards to move between columns</li>
-                <li>→ 💻 Code tasks: click "✏️ Write Code" button</li>
-                <li>→ Write code → AI reviews → auto moves to Done if PASSED</li>
+                <li>→ Drag non-code cards to move between columns</li>
+                <li>→ 💻 Code tasks: click "✏️ Write Code"</li>
+                <li>→ AI PASSED → card moves to Review</li>
+                <li>→ Mentor approves → card moves to Done</li>
                 <li>→ Red cards are blocked — talk to mentor</li>
               </ul>
             </div>
@@ -77,8 +78,8 @@ function HowToUse({ phase }) {
             </div>
           </div>
           <div className="bg-purple-50 border border-purple-200 rounded-xl p-3">
-            <p className="font-bold text-purple-700 mb-1">💻 How Code Tasks Work</p>
-            <p>Cards with 💻 badge require you to write code. Click "✏️ Write Code" → Monaco editor opens → write your solution → Submit → AI runs your code + reviews it → PASSED = card auto moves to Done! ✅</p>
+            <p className="font-bold text-purple-700 mb-1">💻 Code Task Flow</p>
+            <p>Click "✏️ Write Code" → Monaco editor opens → write solution → Submit → AI runs your code → PASSED = card moves to Review → mentor drags to Done ✅ · FAILED = fix and resubmit</p>
           </div>
         </div>
       )}
@@ -120,7 +121,6 @@ function ActiveView({ sprint, board, burndown, userId, cohortId, onTaskMove, onB
 
   return (
     <div className="space-y-5">
-      {/* Code editor modal */}
       {codeTask && (
         <CodeEditorModal
           task={codeTask}
@@ -149,7 +149,6 @@ function ActiveView({ sprint, board, burndown, userId, cohortId, onTaskMove, onB
         ))}
       </div>
 
-      {/* My Tasks with Write Code button */}
       {myTasks.length > 0 && (
         <div className="bg-white rounded-2xl shadow-sm p-5">
           <h3 className="font-bold text-gray-800 mb-3">My Cards ({myTasks.length})</h3>
@@ -170,11 +169,15 @@ function ActiveView({ sprint, board, burndown, userId, cohortId, onTaskMove, onB
                     <p className="text-sm font-medium text-gray-800 truncate">{task.title}</p>
                   </div>
                   {task.blocked && <p className="text-xs text-red-600 mt-0.5">🚫 Blocked — talk to your mentor</p>}
-                  {task.isCodeTask && task.status !== 'DONE' && (
-                    <p className="text-xs text-purple-600 mt-0.5">Write code → AI reviews → auto moves to Done ✨</p>
+                  {/* ✅ Updated message for new flow */}
+                  {task.isCodeTask && task.status === 'IN_PROGRESS' && (
+                    <p className="text-xs text-purple-600 mt-0.5">Write code → AI reviews → moves to Review → mentor approves → Done ✨</p>
                   )}
-                  {task.codeSubmissions?.[0]?.passed && (
-                    <p className="text-xs text-emerald-600 mt-0.5">✅ Code approved by AI</p>
+                  {task.isCodeTask && task.status === 'REVIEW' && (
+                    <p className="text-xs text-amber-600 mt-0.5">⏳ AI approved — waiting for mentor to move to Done</p>
+                  )}
+                  {task.status === 'DONE' && (
+                    <p className="text-xs text-emerald-600 mt-0.5">✅ Completed</p>
                   )}
                 </div>
                 <div className="flex items-center gap-2 ml-2 shrink-0">
@@ -189,7 +192,8 @@ function ActiveView({ sprint, board, burndown, userId, cohortId, onTaskMove, onB
                   }`}>
                     {task.status.replace('_', ' ')}
                   </span>
-                  {task.isCodeTask && task.status !== 'DONE' && (
+                  {/* ✅ Show Write Code only when IN_PROGRESS (not REVIEW or DONE) */}
+                  {task.isCodeTask && task.status === 'IN_PROGRESS' && (
                     <button
                       onClick={() => setCodeTask(task)}
                       className="text-xs bg-purple-600 text-white px-3 py-1.5 rounded-lg hover:bg-purple-700 transition font-medium"
@@ -213,7 +217,7 @@ function ActiveView({ sprint, board, burndown, userId, cohortId, onTaskMove, onB
         <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
           <h3 className="font-bold text-gray-800">Sprint Board</h3>
           <div className="flex items-center gap-2">
-            <p className="text-xs text-gray-500">Drag any card to move it · 💻 = requires code submission</p>
+            <p className="text-xs text-gray-500">Drag cards · 💻 = code task · Review = AI approved, awaiting mentor</p>
             <ActivityFeed cohortId={cohortId} />
           </div>
         </div>

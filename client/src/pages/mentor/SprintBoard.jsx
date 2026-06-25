@@ -6,8 +6,6 @@ import BurndownChart from '../../components/BurndownChart';
 import ActivityFeed from '../../components/ActivityFeed';
 import { socket } from '../../lib/socket';
 
-const STORY_POINTS = [0, 1, 2, 3, 5, 8, 13];
-
 const LANGUAGES = [
   { value: 'python', label: 'Python' },
   { value: 'javascript', label: 'JavaScript' },
@@ -81,15 +79,15 @@ function AddCardForm({ interns, onAdd, onCancel }) {
           </select>
         </div>
         <div>
+          {/* ✅ Free number input for story points */}
           <label className="block text-xs font-semibold text-gray-600 mb-1">Story Points</label>
-          <div className="flex gap-1 flex-wrap">
-            {STORY_POINTS.map((p) => (
-              <button key={p} type="button" onClick={() => setPoints(p)}
-                className={`text-xs px-2 py-1 rounded-lg font-bold transition ${points === p ? 'bg-purple-600 text-white' : 'bg-white border border-gray-300 text-gray-600 hover:border-purple-400'}`}>
-                {p === 0 ? '?' : p}
-              </button>
-            ))}
-          </div>
+          <input
+            type="number" value={points}
+            onChange={(e) => setPoints(Math.max(0, parseInt(e.target.value) || 0))}
+            min={0}
+            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
+            placeholder="e.g. 5"
+          />
         </div>
       </div>
 
@@ -136,6 +134,8 @@ function EditCardModal({ task, interns, onSave, onClose }) {
   const [codeLanguage, setCodeLanguage] = useState(task.codeLanguage || 'python');
   const [saving, setSaving] = useState(false);
 
+  const willReset = task.isCodeTask && (task.status === 'DONE' || task.status === 'REVIEW');
+
   const handleSave = async () => {
     setSaving(true);
     try {
@@ -159,6 +159,12 @@ function EditCardModal({ task, interns, onSave, onClose }) {
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
         </div>
         <div className="p-6 space-y-4">
+          {/* ✅ Warning if editing a passed code task */}
+          {willReset && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-700">
+              ⚠️ This card was already AI-approved. Editing it will reset it to <strong>In Progress</strong> and the intern will need to resubmit code.
+            </div>
+          )}
           <div>
             <label className="block text-xs font-semibold text-gray-600 mb-1">Title *</label>
             <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} autoFocus
@@ -181,15 +187,15 @@ function EditCardModal({ task, interns, onSave, onClose }) {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-2">Story Points</label>
-            <div className="flex gap-1.5 flex-wrap">
-              {STORY_POINTS.map((p) => (
-                <button key={p} type="button" onClick={() => setPoints(p)}
-                  className={`text-sm px-3 py-1.5 rounded-lg font-bold transition ${points === p ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
-                  {p === 0 ? '?' : p}
-                </button>
-              ))}
-            </div>
+            {/* ✅ Free number input */}
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Story Points</label>
+            <input
+              type="number" value={points}
+              onChange={(e) => setPoints(Math.max(0, parseInt(e.target.value) || 0))}
+              min={0}
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+              placeholder="e.g. 5"
+            />
           </div>
           <div className="flex items-center gap-3 p-3 bg-purple-50 border border-purple-100 rounded-xl">
             <input type="checkbox" id="editIsCodeTask" checked={isCodeTask}
@@ -239,7 +245,7 @@ function HowToUse() {
             <p className="font-bold text-amber-600 mb-2">📋 PLANNING Phase</p>
             <ul className="space-y-1 text-gray-600 text-xs">
               <li>→ Set sprint capacity</li>
-              <li>→ Add cards, set story points</li>
+              <li>→ Add cards, set any story points</li>
               <li>→ Toggle 💻 Code Task for coding challenges</li>
               <li>→ Write clear description — AI uses it to evaluate</li>
               <li>→ Click 🚀 Start Sprint when ready</li>
@@ -249,17 +255,17 @@ function HowToUse() {
             <p className="font-bold text-blue-600 mb-2">🏃 ACTIVE Phase</p>
             <ul className="space-y-1 text-gray-600 text-xs">
               <li>→ Add/edit cards anytime</li>
-              <li>→ 💻 Code tasks: intern writes code → AI reviews → auto DONE</li>
-              <li>→ Block cards if intern is stuck</li>
-              <li>→ Click 🗑 Cancel Sprint to delete it</li>
+              <li>→ 💻 Code tasks: intern submits → AI approves → moves to Review</li>
+              <li>→ You drag from Review → Done to approve</li>
+              <li>→ Editing an approved card resets it to In Progress</li>
             </ul>
           </div>
           <div>
-            <p className="font-bold text-purple-600 mb-2">💡 How AI evaluates code</p>
+            <p className="font-bold text-purple-600 mb-2">💡 Code Task Flow</p>
             <ul className="space-y-1 text-gray-600 text-xs">
-              <li>→ Reads card title + description as requirements</li>
-              <li>→ Runs code via Piston API</li>
-              <li>→ PASSED → auto moves to Done ✅</li>
+              <li>→ Intern writes code → AI reviews</li>
+              <li>→ PASSED → moves to Review column</li>
+              <li>→ You drag to Done to finalize ✅</li>
               <li>→ FAILED → intern fixes and resubmits</li>
             </ul>
           </div>
@@ -365,14 +371,14 @@ function PlanningPhase({ sprint, interns, onAddTask, onDeleteTask, onUpdatePoint
                   </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  <div className="flex gap-1">
-                    {STORY_POINTS.map((p) => (
-                      <button key={p} onClick={() => onUpdatePoints(task.id, p)}
-                        className={`text-xs px-1.5 py-0.5 rounded font-bold transition ${(task.storyPoints || 0) === p ? 'bg-purple-600 text-white' : 'bg-gray-200 text-gray-500 hover:bg-gray-300'}`}>
-                        {p === 0 ? '?' : p}
-                      </button>
-                    ))}
-                  </div>
+                  {/* ✅ Free number input inline */}
+                  <input
+                    type="number"
+                    value={task.storyPoints || 0}
+                    onChange={(e) => onUpdatePoints(task.id, Math.max(0, parseInt(e.target.value) || 0))}
+                    min={0}
+                    className="w-16 text-xs px-2 py-1 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-purple-500 text-center"
+                  />
                   <button onClick={() => setEditingTask(task)}
                     className="text-xs text-blue-400 hover:text-blue-600 opacity-0 group-hover:opacity-100 transition px-1">✏️</button>
                   <button onClick={() => onDeleteTask(task.id)}
@@ -445,7 +451,7 @@ function ActivePhase({ sprint, board, burndown, interns, userId, onTaskMove, onT
           <p className="text-sm text-blue-700 bg-blue-50 px-3 py-2 rounded-lg mb-4">🎯 {sprint.goal}</p>
         )}
 
-        <p className="text-xs text-gray-400 mb-3">💡 Click ✏️ Edit on any card · 💻 = Code Task</p>
+        <p className="text-xs text-gray-400 mb-3">💡 Click ✏️ Edit on any card · Cards in Review = AI approved, drag to Done to finalize · 💻 = Code Task</p>
 
         {board && (
           <KanbanBoard
@@ -893,7 +899,6 @@ export default function SprintBoard() {
         </div>
       )}
 
-      {/* Sprint selector */}
       {sprints.length > 0 && (
         <div className="flex items-center gap-3 flex-wrap">
           <label className="text-sm font-medium text-gray-700 shrink-0">Sprint:</label>
@@ -911,7 +916,6 @@ export default function SprintBoard() {
         </div>
       )}
 
-      {/* Sprint info strip */}
       {sprint && (
         <div className="bg-white rounded-2xl shadow-sm px-5 py-3 flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-3 flex-wrap">
