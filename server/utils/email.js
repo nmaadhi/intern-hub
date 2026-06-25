@@ -1,9 +1,17 @@
-const { Resend } = require('resend');
+const nodemailer = require('nodemailer');
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const transporter = nodemailer.createTransport({
+  host: 'in-v3.mailjet.com',
+  port: 587,
+  secure: false,
+  auth: {
+    user: process.env.MAILJET_USER,
+    pass: process.env.MAILJET_PASS,
+  },
+});
 
 const APP_URL = process.env.CLIENT_URL || 'http://localhost:5173';
-const FROM = 'InternHub <onboarding@resend.dev>';
+const FROM = '"InternHub" <nmaadhithya13@gmail.com>';
 
 async function sendMentorWelcome({ name, email, tempPassword, setupToken }) {
   const setPasswordLink = setupToken
@@ -11,7 +19,7 @@ async function sendMentorWelcome({ name, email, tempPassword, setupToken }) {
     : `${APP_URL}/forgot-password`;
 
   try {
-    await resend.emails.send({
+    await transporter.sendMail({
       from: FROM,
       to: email,
       subject: 'Welcome to InternHub — Your Mentor Account',
@@ -29,19 +37,12 @@ async function sendMentorWelcome({ name, email, tempPassword, setupToken }) {
               </span>
             </p>
           </div>
-          <p style="color: #374151;">
-            You can login directly using the temporary password above.<br/>
-            <strong>Optionally</strong>, if you want to set your own password, click the button below:
-          </p>
           <a href="${setPasswordLink}"
             style="background:#7c3aed; color:white; padding:12px 24px; border-radius:8px; text-decoration:none; display:inline-block; margin:12px 0; font-weight:bold;">
             Set My Own Password (Optional)
           </a>
           <p style="color:#e53e3e; font-size:12px; margin-top:8px;">
-            ⚠️ This link expires in <strong>1 hour</strong>. After that, use the temporary password to login.
-          </p>
-          <p style="color:#9ca3af; font-size:11px; margin-top:16px;">
-            If you did not expect this email, please ignore it.
+            ⚠️ This link expires in <strong>1 hour</strong>.
           </p>
         </div>
       `,
@@ -59,7 +60,7 @@ async function sendInternWelcome({ name, email, internId, tempPassword, setupTok
     : `${APP_URL}/forgot-password`;
 
   try {
-    await resend.emails.send({
+    await transporter.sendMail({
       from: FROM,
       to: email,
       subject: 'Welcome to InternHub — Your Intern Account',
@@ -78,19 +79,12 @@ async function sendInternWelcome({ name, email, internId, tempPassword, setupTok
               </span>
             </p>
           </div>
-          <p style="color: #374151;">
-            You can login directly using the temporary password above.<br/>
-            <strong>Optionally</strong>, if you want to set your own password, click the button below:
-          </p>
           <a href="${setPasswordLink}"
             style="background:#059669; color:white; padding:12px 24px; border-radius:8px; text-decoration:none; display:inline-block; margin:12px 0; font-weight:bold;">
             Set My Own Password (Optional)
           </a>
           <p style="color:#e53e3e; font-size:12px; margin-top:8px;">
-            ⚠️ This link expires in <strong>1 hour</strong>. After that, use the temporary password to login.
-          </p>
-          <p style="color:#9ca3af; font-size:11px; margin-top:16px;">
-            If you did not expect this email, please ignore it.
+            ⚠️ This link expires in <strong>1 hour</strong>.
           </p>
         </div>
       `,
@@ -105,7 +99,7 @@ async function sendInternWelcome({ name, email, internId, tempPassword, setupTok
 async function sendPasswordReset({ name, email, resetToken }) {
   const resetLink = `${APP_URL}/reset-password?token=${resetToken}`;
   try {
-    await resend.emails.send({
+    await transporter.sendMail({
       from: FROM,
       to: email,
       subject: 'InternHub — Reset Your Password',
@@ -118,15 +112,8 @@ async function sendPasswordReset({ name, email, resetToken }) {
             style="background:#1d4ed8; color:white; padding:12px 24px; border-radius:8px; text-decoration:none; display:inline-block; margin:16px 0; font-weight:bold;">
             Reset My Password
           </a>
-          <p style="color:#e53e3e; font-size:13px;">
-            ⚠️ This link expires in <strong>1 hour</strong>.
-          </p>
-          <p style="color:#6b7280; font-size:12px;">
-            If you did not request this, ignore this email — your password will not change.
-          </p>
-          <p style="color:#9ca3af; font-size:11px; margin-top:16px;">
-            Or copy this link: ${resetLink}
-          </p>
+          <p style="color:#e53e3e; font-size:13px;">⚠️ This link expires in <strong>1 hour</strong>.</p>
+          <p style="color:#9ca3af; font-size:11px; margin-top:16px;">Or copy this link: ${resetLink}</p>
         </div>
       `,
     });
