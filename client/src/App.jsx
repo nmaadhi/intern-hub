@@ -12,7 +12,7 @@ const NotFound = lazy(() => import('./pages/NotFound'));
 const ChangePassword = lazy(() => import('./pages/ChangePassword'));
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
-const Chat = lazy(() => import('./pages/Chat'));
+const Chat = lazy(() => import('./pages/chat'));
 
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
 const ManageMentors = lazy(() => import('./pages/admin/ManageMentors'));
