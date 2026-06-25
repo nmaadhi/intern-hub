@@ -1,17 +1,9 @@
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 
-const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 587,
-  secure: false,
-  auth: {
-    user: process.env.GMAIL_USER,
-    pass: process.env.GMAIL_PASS,
-  },
-});
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 const APP_URL = process.env.CLIENT_URL || 'http://localhost:5173';
-const FROM = `"InternHub" <${process.env.GMAIL_USER}>`;
+const FROM = 'InternHub <onboarding@resend.dev>';
 
 async function sendMentorWelcome({ name, email, tempPassword, setupToken }) {
   const setPasswordLink = setupToken
@@ -19,7 +11,7 @@ async function sendMentorWelcome({ name, email, tempPassword, setupToken }) {
     : `${APP_URL}/forgot-password`;
 
   try {
-    await transporter.sendMail({
+    await resend.emails.send({
       from: FROM,
       to: email,
       subject: 'Welcome to InternHub — Your Mentor Account',
@@ -27,7 +19,6 @@ async function sendMentorWelcome({ name, email, tempPassword, setupToken }) {
         <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px;">
           <h2 style="color: #7c3aed;">Welcome to InternHub, ${name}!</h2>
           <p>Your mentor account has been created. Here are your login details:</p>
-
           <div style="background: #f3f4f6; padding: 16px; border-radius: 8px; margin: 16px 0; border-left: 4px solid #7c3aed;">
             <p style="margin: 4px 0;"><strong>Login URL:</strong> <a href="${APP_URL}/login">${APP_URL}/login</a></p>
             <p style="margin: 4px 0;"><strong>Email:</strong> ${email}</p>
@@ -38,17 +29,14 @@ async function sendMentorWelcome({ name, email, tempPassword, setupToken }) {
               </span>
             </p>
           </div>
-
           <p style="color: #374151;">
             You can login directly using the temporary password above.<br/>
             <strong>Optionally</strong>, if you want to set your own password, click the button below:
           </p>
-
           <a href="${setPasswordLink}"
             style="background:#7c3aed; color:white; padding:12px 24px; border-radius:8px; text-decoration:none; display:inline-block; margin:12px 0; font-weight:bold;">
             Set My Own Password (Optional)
           </a>
-
           <p style="color:#e53e3e; font-size:12px; margin-top:8px;">
             ⚠️ This link expires in <strong>1 hour</strong>. After that, use the temporary password to login.
           </p>
@@ -71,7 +59,7 @@ async function sendInternWelcome({ name, email, internId, tempPassword, setupTok
     : `${APP_URL}/forgot-password`;
 
   try {
-    await transporter.sendMail({
+    await resend.emails.send({
       from: FROM,
       to: email,
       subject: 'Welcome to InternHub — Your Intern Account',
@@ -79,7 +67,6 @@ async function sendInternWelcome({ name, email, internId, tempPassword, setupTok
         <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px;">
           <h2 style="color: #059669;">Welcome to InternHub, ${name}!</h2>
           <p>Your intern account has been created. Here are your login details:</p>
-
           <div style="background: #f3f4f6; padding: 16px; border-radius: 8px; margin: 16px 0; border-left: 4px solid #059669;">
             <p style="margin: 4px 0;"><strong>Login URL:</strong> <a href="${APP_URL}/login">${APP_URL}/login</a></p>
             <p style="margin: 4px 0;"><strong>Email:</strong> ${email}</p>
@@ -91,17 +78,14 @@ async function sendInternWelcome({ name, email, internId, tempPassword, setupTok
               </span>
             </p>
           </div>
-
           <p style="color: #374151;">
             You can login directly using the temporary password above.<br/>
             <strong>Optionally</strong>, if you want to set your own password, click the button below:
           </p>
-
           <a href="${setPasswordLink}"
             style="background:#059669; color:white; padding:12px 24px; border-radius:8px; text-decoration:none; display:inline-block; margin:12px 0; font-weight:bold;">
             Set My Own Password (Optional)
           </a>
-
           <p style="color:#e53e3e; font-size:12px; margin-top:8px;">
             ⚠️ This link expires in <strong>1 hour</strong>. After that, use the temporary password to login.
           </p>
@@ -121,7 +105,7 @@ async function sendInternWelcome({ name, email, internId, tempPassword, setupTok
 async function sendPasswordReset({ name, email, resetToken }) {
   const resetLink = `${APP_URL}/reset-password?token=${resetToken}`;
   try {
-    await transporter.sendMail({
+    await resend.emails.send({
       from: FROM,
       to: email,
       subject: 'InternHub — Reset Your Password',
@@ -130,12 +114,10 @@ async function sendPasswordReset({ name, email, resetToken }) {
           <h2 style="color: #1d4ed8;">Reset Your Password</h2>
           <p>Hi ${name},</p>
           <p>We received a request to reset your InternHub password. Click the button below:</p>
-
           <a href="${resetLink}"
             style="background:#1d4ed8; color:white; padding:12px 24px; border-radius:8px; text-decoration:none; display:inline-block; margin:16px 0; font-weight:bold;">
             Reset My Password
           </a>
-
           <p style="color:#e53e3e; font-size:13px;">
             ⚠️ This link expires in <strong>1 hour</strong>.
           </p>
