@@ -1,17 +1,9 @@
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 
-const transporter = nodemailer.createTransport({
-  host: 'smtp-relay.brevo.com',
-  port: 587,
-  secure: false,
-  auth: {
-    user: process.env.BREVO_USER,
-    pass: process.env.BREVO_PASS,
-  },
-});
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 const APP_URL = process.env.CLIENT_URL || 'http://localhost:5173';
-const FROM = `"InternHub" <${process.env.BREVO_USER}>`;
+const FROM = 'InternHub <onboarding@resend.dev>';
 
 async function sendMentorWelcome({ name, email, tempPassword, setupToken }) {
   const setPasswordLink = setupToken
@@ -19,7 +11,7 @@ async function sendMentorWelcome({ name, email, tempPassword, setupToken }) {
     : `${APP_URL}/forgot-password`;
 
   try {
-    await transporter.sendMail({
+    await resend.emails.send({
       from: FROM,
       to: email,
       subject: 'Welcome to InternHub — Your Mentor Account',
@@ -67,7 +59,7 @@ async function sendInternWelcome({ name, email, internId, tempPassword, setupTok
     : `${APP_URL}/forgot-password`;
 
   try {
-    await transporter.sendMail({
+    await resend.emails.send({
       from: FROM,
       to: email,
       subject: 'Welcome to InternHub — Your Intern Account',
@@ -113,7 +105,7 @@ async function sendInternWelcome({ name, email, internId, tempPassword, setupTok
 async function sendPasswordReset({ name, email, resetToken }) {
   const resetLink = `${APP_URL}/reset-password?token=${resetToken}`;
   try {
-    await transporter.sendMail({
+    await resend.emails.send({
       from: FROM,
       to: email,
       subject: 'InternHub — Reset Your Password',
