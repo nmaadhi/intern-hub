@@ -35,11 +35,13 @@ export default function CodeEditorModal({ task, onClose, onPassed }) {
 
   const langConfig = LANGUAGES.find((l) => l.value === language) || LANGUAGES[0];
 
+  // ✅ Load latest submission — always load code so it's never lost
   useEffect(() => {
     api.get(`/sprint/tasks/${task.id}/my-submission`)
       .then((res) => {
         if (res.data.submission) {
           setPastSubmission(res.data.submission);
+          // ✅ Always load previous code into editor so intern can edit and resubmit
           setCode(res.data.submission.code);
           setLanguage(res.data.submission.language);
         }
@@ -55,10 +57,17 @@ export default function CodeEditorModal({ task, onClose, onPassed }) {
     try {
       const res = await api.post(`/sprint/tasks/${task.id}/code-submit`, { code, language });
       setResult(res.data);
-      setPastSubmission({ code, language, aiReview: res.data.review, passed: res.data.passed, aiVerdict: res.data.verdict });
+      setPastSubmission({
+        code, language,
+        aiReview: res.data.review,
+        passed: res.data.passed,
+        aiVerdict: res.data.verdict,
+      });
       setActiveTab('result');
+      // ✅ If passed → notify parent but don't auto-close immediately
+      // Parent will refresh board to show card in REVIEW
       if (res.data.passed) {
-        setTimeout(() => onPassed(), 1500);
+        setTimeout(() => onPassed(), 2000);
       }
     } catch (err) {
       alert(err.response?.data?.error || 'Failed to submit code');
@@ -73,6 +82,10 @@ export default function CodeEditorModal({ task, onClose, onPassed }) {
     return 'text-red-500';
   };
 
+  // ✅ Can resubmit if: task is IN_PROGRESS (not yet passed/in review)
+  // After rejection, task goes back to IN_PROGRESS so button appears again
+  const canSubmit = task.status === 'IN_PROGRESS';
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-2">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col overflow-hidden">
@@ -83,10 +96,21 @@ export default function CodeEditorModal({ task, onClose, onPassed }) {
             <span className="text-lg">💻</span>
             <div>
               <h3 className="font-bold text-gray-800 text-sm">{task.title}</h3>
-              {task.description && <p className="text-xs text-gray-500">{task.description}</p>}
+              {task.description && <p className="text-xs text-gray-500 mt-0.5">{task.description}</p>}
             </div>
           </div>
           <div className="flex items-center gap-3">
+            {/* Status badge */}
+            {task.status === 'REVIEW' && (
+              <span className="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded-lg font-medium">
+                ⏳ Awaiting mentor approval
+              </span>
+            )}
+            {task.status === 'DONE' && (
+              <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded-lg font-medium">
+                ✅ Mentor Approved
+              </span>
+            )}
             <select
               value={language}
               onChange={(e) => {
@@ -105,7 +129,7 @@ export default function CodeEditorModal({ task, onClose, onPassed }) {
         <div className="flex border-b border-gray-100 px-5">
           {[
             { id: 'editor', label: '📝 Code Editor' },
-            { id: 'result', label: `🤖 AI Review${result ? (result.passed ? ' ✅' : ' ❌') : ''}` },
+            { id: 'result', label: `🤖 AI Review${result ? (result.passed ? ' ✅' : ' ❌') : pastSubmission ? (pastSubmission.passed ? ' ✅' : ' ❌') : ''}` },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -128,9 +152,37 @@ export default function CodeEditorModal({ task, onClose, onPassed }) {
         {/* Content */}
         <div className="flex-1 overflow-hidden">
 
-          {/* Editor tab */}
+          {/* ── Editor tab ── */}
           {activeTab === 'editor' && (
             <div className="flex flex-col h-full">
+              {/* ✅ Info banner when task is in REVIEW or DONE */}
+              {task.status === 'REVIEW' && (
+                <div className="bg-amber-50 border-b border-amber-200 px-5 py-2 flex items-center gap-2">
+                  <span>⏳</span>
+                  <p className="text-xs text-amber-800 font-medium">
+                    Your code was AI-approved and is waiting for mentor to approve or reject.
+                    You can view your code below but cannot resubmit until mentor acts.
+                  </p>
+                </div>
+              )}
+              {task.status === 'DONE' && (
+                <div className="bg-emerald-50 border-b border-emerald-200 px-5 py-2 flex items-center gap-2">
+                  <span>✅</span>
+                  <p className="text-xs text-emerald-800 font-medium">
+                    Mentor approved this code. Task is complete!
+                  </p>
+                </div>
+              )}
+              {/* ✅ Rejection message — shown when IN_PROGRESS and has a past submission */}
+              {task.status === 'IN_PROGRESS' && pastSubmission && !result && (
+                <div className="bg-red-50 border-b border-red-200 px-5 py-2 flex items-center gap-2">
+                  <span>🔄</span>
+                  <p className="text-xs text-red-700 font-medium">
+                    Mentor rejected your previous submission. Your code is loaded below — fix and resubmit.
+                  </p>
+                </div>
+              )}
+
               <div className="flex-1">
                 <Editor
                   height="100%"
@@ -146,19 +198,23 @@ export default function CodeEditorModal({ task, onClose, onPassed }) {
                     roundedSelection: true,
                     padding: { top: 12 },
                     fontFamily: 'JetBrains Mono, Fira Code, monospace',
+                    readOnly: !canSubmit,
                   }}
                 />
               </div>
+
               <div className="px-5 py-3 border-t border-gray-100 bg-gray-50 flex items-center justify-between">
                 <p className="text-xs text-gray-500">
-                  💡 Your code will be executed and then reviewed by AI
-                  {task.isCodeTask && pastSubmission?.passed && (
-                    <span className="ml-2 text-emerald-600 font-medium">✅ Already passed!</span>
-                  )}
+                  {canSubmit
+                    ? '💡 Your code will be executed and reviewed by AI'
+                    : task.status === 'REVIEW'
+                    ? '⏳ Waiting for mentor to approve or reject'
+                    : '✅ Task completed'
+                  }
                 </p>
                 <button
                   onClick={handleSubmit}
-                  disabled={submitting || !code.trim() || pastSubmission?.passed}
+                  disabled={submitting || !code.trim() || !canSubmit}
                   className="bg-purple-600 text-white px-5 py-2 rounded-xl hover:bg-purple-700 disabled:opacity-50 transition font-medium text-sm flex items-center gap-2"
                 >
                   {submitting ? (
@@ -166,8 +222,10 @@ export default function CodeEditorModal({ task, onClose, onPassed }) {
                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                       Running & Reviewing...
                     </>
-                  ) : pastSubmission?.passed ? (
-                    '✅ Already Passed'
+                  ) : !canSubmit ? (
+                    task.status === 'REVIEW' ? '⏳ Awaiting Mentor' : '✅ Completed'
+                  ) : pastSubmission ? (
+                    '🔄 Fix & Resubmit'
                   ) : (
                     '🚀 Submit for AI Review'
                   )}
@@ -176,7 +234,7 @@ export default function CodeEditorModal({ task, onClose, onPassed }) {
             </div>
           )}
 
-          {/* Result tab */}
+          {/* ── Result tab ── */}
           {activeTab === 'result' && (
             <div className="h-full overflow-y-auto p-5 space-y-4">
               {!result && !pastSubmission ? (
@@ -204,7 +262,17 @@ export default function CodeEditorModal({ task, onClose, onPassed }) {
                         {r.score !== undefined && (
                           <p className={`text-3xl font-bold mt-1 ${scoreColor(r.score)}`}>{r.score}/100</p>
                         )}
-                        {passed && <p className="text-emerald-600 text-sm mt-2 font-medium">🎉 Task automatically moved to Done!</p>}
+                        {/* ✅ Updated message — goes to Review not Done */}
+                        {passed && (
+                          <div className="mt-3 bg-amber-50 border border-amber-200 rounded-xl p-3">
+                            <p className="text-amber-800 text-sm font-medium">
+                              🎉 AI approved! Card moved to Review column.
+                            </p>
+                            <p className="text-amber-600 text-xs mt-1">
+                              Waiting for your mentor to approve → Done ✅ or reject → fix and resubmit
+                            </p>
+                          </div>
+                        )}
                         {!passed && <p className="text-red-500 text-sm mt-2">Fix the issues below and resubmit.</p>}
                       </div>
 
@@ -261,7 +329,7 @@ export default function CodeEditorModal({ task, onClose, onPassed }) {
                         </div>
                       )}
 
-                      {!passed && (
+                      {!passed && canSubmit && (
                         <button
                           onClick={() => setActiveTab('editor')}
                           className="w-full bg-purple-600 text-white py-2.5 rounded-xl hover:bg-purple-700 transition font-medium text-sm"
@@ -276,13 +344,18 @@ export default function CodeEditorModal({ task, onClose, onPassed }) {
             </div>
           )}
 
-          {/* History tab */}
+          {/* ── History tab ── */}
           {activeTab === 'history' && pastSubmission && (
             <div className="h-full overflow-y-auto p-5 space-y-4">
               <div className={`rounded-xl p-4 border ${pastSubmission.passed ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
                 <p className="font-bold text-sm">
-                  {pastSubmission.passed ? '✅ Passed' : '❌ Failed'} · {pastSubmission.language}
+                  {pastSubmission.passed ? '✅ AI Passed' : '❌ AI Failed'} · {pastSubmission.language}
                 </p>
+                {task.status === 'IN_PROGRESS' && pastSubmission.passed && (
+                  <p className="text-xs text-amber-700 mt-1">
+                    ⚠️ Mentor rejected — code is loaded in editor for you to fix and resubmit.
+                  </p>
+                )}
               </div>
               <div className="bg-gray-900 rounded-xl overflow-hidden">
                 <div className="px-4 py-2 bg-gray-800 flex items-center justify-between">
@@ -298,6 +371,26 @@ export default function CodeEditorModal({ task, onClose, onPassed }) {
                   {pastSubmission.code}
                 </pre>
               </div>
+
+              {/* Show AI review from past submission */}
+              {pastSubmission.aiReview && (
+                <div className="space-y-3">
+                  <h4 className="font-bold text-gray-700 text-sm">Previous AI Review:</h4>
+                  {pastSubmission.aiReview.summary && (
+                    <div className="bg-white rounded-xl border border-gray-200 p-3">
+                      <p className="text-xs text-gray-700">{pastSubmission.aiReview.summary}</p>
+                    </div>
+                  )}
+                  {pastSubmission.aiReview.improvements?.length > 0 && (
+                    <div className="bg-amber-50 rounded-xl border border-amber-100 p-3">
+                      <p className="text-xs font-bold text-amber-800 mb-1">🔧 Things to fix:</p>
+                      {pastSubmission.aiReview.improvements.map((s, i) => (
+                        <p key={i} className="text-xs text-amber-700">→ {s}</p>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>
