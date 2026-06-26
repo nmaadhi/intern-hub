@@ -173,8 +173,8 @@ function ActiveView({ sprint, board, burndown, userId, cohortId, onTaskMove, onB
                     <p className="text-sm font-medium text-gray-800 truncate">{task.title}</p>
                   </div>
                   {task.blocked && <p className="text-xs text-red-600 mt-0.5">🚫 Blocked — talk to your mentor</p>}
-                  {/* ✅ Status-specific messages */}
-                  {task.isCodeTask && task.status === 'IN_PROGRESS' && (
+                  {/* ✅ Show message for TODO and IN_PROGRESS code tasks */}
+                  {task.isCodeTask && task.status !== 'REVIEW' && task.status !== 'DONE' && (
                     <p className="text-xs text-purple-600 mt-0.5">
                       {task.codeSubmissions?.[0] ? '🔄 Rejected — fix and resubmit' : '✏️ Write your code and submit for AI review'}
                     </p>
@@ -198,8 +198,8 @@ function ActiveView({ sprint, board, burndown, userId, cohortId, onTaskMove, onB
                   }`}>
                     {task.status.replace('_', ' ')}
                   </span>
-                  {/* ✅ Write Code only when IN_PROGRESS */}
-                  {task.isCodeTask && task.status === 'IN_PROGRESS' && (
+                  {/* ✅ Write Code shows on TODO and IN_PROGRESS */}
+                  {task.isCodeTask && task.status !== 'REVIEW' && task.status !== 'DONE' && (
                     <button
                       onClick={() => setCodeTask(task)}
                       className="text-xs bg-purple-600 text-white px-3 py-1.5 rounded-lg hover:bg-purple-700 transition font-medium"
