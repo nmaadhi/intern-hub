@@ -35,13 +35,12 @@ export default function CodeEditorModal({ task, onClose, onPassed }) {
 
   const langConfig = LANGUAGES.find((l) => l.value === language) || LANGUAGES[0];
 
-  // ✅ Load latest submission — always load code so it's never lost
+  // ✅ Always load previous code so it's never lost
   useEffect(() => {
     api.get(`/sprint/tasks/${task.id}/my-submission`)
       .then((res) => {
         if (res.data.submission) {
           setPastSubmission(res.data.submission);
-          // ✅ Always load previous code into editor so intern can edit and resubmit
           setCode(res.data.submission.code);
           setLanguage(res.data.submission.language);
         }
@@ -64,8 +63,6 @@ export default function CodeEditorModal({ task, onClose, onPassed }) {
         aiVerdict: res.data.verdict,
       });
       setActiveTab('result');
-      // ✅ If passed → notify parent but don't auto-close immediately
-      // Parent will refresh board to show card in REVIEW
       if (res.data.passed) {
         setTimeout(() => onPassed(), 2000);
       }
@@ -82,9 +79,8 @@ export default function CodeEditorModal({ task, onClose, onPassed }) {
     return 'text-red-500';
   };
 
-  // ✅ Can resubmit if: task is IN_PROGRESS (not yet passed/in review)
-  // After rejection, task goes back to IN_PROGRESS so button appears again
-  const canSubmit = task.status === 'IN_PROGRESS';
+  // ✅ Can submit only when IN_PROGRESS or TODO
+  const canSubmit = task.status !== 'REVIEW' && task.status !== 'DONE';
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-2">
@@ -100,7 +96,6 @@ export default function CodeEditorModal({ task, onClose, onPassed }) {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            {/* Status badge */}
             {task.status === 'REVIEW' && (
               <span className="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded-lg font-medium">
                 ⏳ Awaiting mentor approval
@@ -155,13 +150,12 @@ export default function CodeEditorModal({ task, onClose, onPassed }) {
           {/* ── Editor tab ── */}
           {activeTab === 'editor' && (
             <div className="flex flex-col h-full">
-              {/* ✅ Info banner when task is in REVIEW or DONE */}
+              {/* Status banners */}
               {task.status === 'REVIEW' && (
                 <div className="bg-amber-50 border-b border-amber-200 px-5 py-2 flex items-center gap-2">
                   <span>⏳</span>
                   <p className="text-xs text-amber-800 font-medium">
-                    Your code was AI-approved and is waiting for mentor to approve or reject.
-                    You can view your code below but cannot resubmit until mentor acts.
+                    AI approved your code — waiting for mentor to approve or reject. You can view but cannot resubmit yet.
                   </p>
                 </div>
               )}
@@ -173,12 +167,12 @@ export default function CodeEditorModal({ task, onClose, onPassed }) {
                   </p>
                 </div>
               )}
-              {/* ✅ Rejection message — shown when IN_PROGRESS and has a past submission */}
-              {task.status === 'IN_PROGRESS' && pastSubmission && !result && (
+              {/* ✅ Rejection banner */}
+              {canSubmit && pastSubmission && !result && (
                 <div className="bg-red-50 border-b border-red-200 px-5 py-2 flex items-center gap-2">
                   <span>🔄</span>
                   <p className="text-xs text-red-700 font-medium">
-                    Mentor rejected your previous submission. Your code is loaded below — fix and resubmit.
+                    Previous submission loaded — fix your code and resubmit.
                   </p>
                 </div>
               )}
@@ -198,7 +192,7 @@ export default function CodeEditorModal({ task, onClose, onPassed }) {
                     roundedSelection: true,
                     padding: { top: 12 },
                     fontFamily: 'JetBrains Mono, Fira Code, monospace',
-                    readOnly: !canSubmit,
+                    readOnly: false, // ✅ Always editable
                   }}
                 />
               </div>
@@ -253,7 +247,6 @@ export default function CodeEditorModal({ task, onClose, onPassed }) {
 
                   return (
                     <>
-                      {/* Verdict banner */}
                       <div className={`rounded-2xl p-5 text-center ${passed ? 'bg-emerald-50 border border-emerald-200' : 'bg-red-50 border border-red-200'}`}>
                         <p className="text-4xl mb-2">{passed ? '✅' : '❌'}</p>
                         <p className={`text-2xl font-black ${passed ? 'text-emerald-700' : 'text-red-600'}`}>
@@ -262,7 +255,6 @@ export default function CodeEditorModal({ task, onClose, onPassed }) {
                         {r.score !== undefined && (
                           <p className={`text-3xl font-bold mt-1 ${scoreColor(r.score)}`}>{r.score}/100</p>
                         )}
-                        {/* ✅ Updated message — goes to Review not Done */}
                         {passed && (
                           <div className="mt-3 bg-amber-50 border border-amber-200 rounded-xl p-3">
                             <p className="text-amber-800 text-sm font-medium">
@@ -276,7 +268,6 @@ export default function CodeEditorModal({ task, onClose, onPassed }) {
                         {!passed && <p className="text-red-500 text-sm mt-2">Fix the issues below and resubmit.</p>}
                       </div>
 
-                      {/* Summary */}
                       {r.summary && (
                         <div className="bg-white rounded-xl border border-gray-200 p-4">
                           <h4 className="font-bold text-gray-800 mb-2 text-sm">📋 Summary</h4>
@@ -284,7 +275,6 @@ export default function CodeEditorModal({ task, onClose, onPassed }) {
                         </div>
                       )}
 
-                      {/* Execution output */}
                       {(output || error) && (
                         <div className="bg-gray-900 rounded-xl p-4">
                           <p className="text-xs text-gray-400 mb-2 font-mono">Terminal Output</p>
@@ -293,7 +283,6 @@ export default function CodeEditorModal({ task, onClose, onPassed }) {
                         </div>
                       )}
 
-                      {/* Strengths */}
                       {r.strengths?.length > 0 && (
                         <div className="bg-emerald-50 rounded-xl border border-emerald-100 p-4">
                           <h4 className="font-bold text-emerald-800 mb-2 text-sm">✅ Strengths</h4>
@@ -307,7 +296,6 @@ export default function CodeEditorModal({ task, onClose, onPassed }) {
                         </div>
                       )}
 
-                      {/* Improvements */}
                       {r.improvements?.length > 0 && (
                         <div className="bg-amber-50 rounded-xl border border-amber-100 p-4">
                           <h4 className="font-bold text-amber-800 mb-2 text-sm">🔧 Improvements Needed</h4>
@@ -321,7 +309,6 @@ export default function CodeEditorModal({ task, onClose, onPassed }) {
                         </div>
                       )}
 
-                      {/* Tip */}
                       {r.tip && (
                         <div className="bg-purple-50 rounded-xl border border-purple-100 p-4">
                           <h4 className="font-bold text-purple-800 mb-2 text-sm">💡 Pro Tip</h4>
@@ -351,9 +338,9 @@ export default function CodeEditorModal({ task, onClose, onPassed }) {
                 <p className="font-bold text-sm">
                   {pastSubmission.passed ? '✅ AI Passed' : '❌ AI Failed'} · {pastSubmission.language}
                 </p>
-                {task.status === 'IN_PROGRESS' && pastSubmission.passed && (
+                {canSubmit && pastSubmission.passed && (
                   <p className="text-xs text-amber-700 mt-1">
-                    ⚠️ Mentor rejected — code is loaded in editor for you to fix and resubmit.
+                    ⚠️ Mentor rejected — code loaded in editor, fix and resubmit.
                   </p>
                 )}
               </div>
@@ -371,8 +358,6 @@ export default function CodeEditorModal({ task, onClose, onPassed }) {
                   {pastSubmission.code}
                 </pre>
               </div>
-
-              {/* Show AI review from past submission */}
               {pastSubmission.aiReview && (
                 <div className="space-y-3">
                   <h4 className="font-bold text-gray-700 text-sm">Previous AI Review:</h4>
