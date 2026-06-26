@@ -41,11 +41,12 @@ function KanbanCard({
   const isCodeTask = task.isCodeTask;
   const aiPassed = task.codeSubmissions?.[0]?.passed;
 
-  // ✅ Write Code only shows for intern when IN_PROGRESS
+  // ✅ Show Write Code for TODO and IN_PROGRESS (not REVIEW or DONE)
   const showWriteCode = role === 'INTERN' && !overlay && !readOnly
-    && isMyTask && isCodeTask && task.status === 'IN_PROGRESS';
+    && isMyTask && isCodeTask
+    && task.status !== 'REVIEW' && task.status !== 'DONE';
 
-  // ✅ Approve/Reject only shows for mentor on code tasks in REVIEW
+  // ✅ Approve/Reject only for mentor on code tasks in REVIEW
   const showApproveReject = role === 'MENTOR' && !overlay && !readOnly
     && isCodeTask && task.status === 'REVIEW';
 
@@ -83,8 +84,7 @@ function KanbanCard({
               {task.blocked && (
                 <span className="text-xs bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-medium">🚫 Blocked</span>
               )}
-              {/* ✅ Show AI Approved badge when in REVIEW */}
-              {isCodeTask && task.status === 'REVIEW' && aiPassed && (
+              {isCodeTask && task.status === 'REVIEW' && (
                 <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">
                   ⏳ AI Approved — Awaiting mentor
                 </span>
@@ -100,10 +100,10 @@ function KanbanCard({
         </div>
       </div>
 
-      {/* ✅ MENTOR: Approve/Reject buttons for code tasks in REVIEW */}
+      {/* ✅ MENTOR: Approve/Reject on REVIEW code tasks */}
       {showApproveReject && (
         <div className="px-3 pb-3 border-t border-amber-100 pt-2 space-y-2">
-          <p className="text-xs text-amber-700 font-medium">AI approved this code — your decision:</p>
+          <p className="text-xs text-amber-700 font-medium">AI approved — your decision:</p>
           <div className="flex gap-2">
             <button
               type="button"
@@ -120,10 +120,17 @@ function KanbanCard({
               ❌ Reject → Redo
             </button>
           </div>
+          <button
+            type="button"
+            onClick={() => onEdit && onEdit(task)}
+            className="w-full text-xs px-3 py-1 rounded-lg font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 transition"
+          >
+            ✏️ Edit card (resets to In Progress)
+          </button>
         </div>
       )}
 
-      {/* MENTOR: Edit / Block / Delete for non-REVIEW code tasks and all non-code tasks */}
+      {/* MENTOR: Normal Edit/Block/Delete for non-REVIEW cards */}
       {role === 'MENTOR' && !overlay && !readOnly && !showApproveReject && (
         <div className="flex gap-2 px-3 pb-3 border-t border-gray-100 pt-2 flex-wrap">
           <button
@@ -154,20 +161,7 @@ function KanbanCard({
         </div>
       )}
 
-      {/* MENTOR: Show Edit button even on REVIEW code tasks (with warning in modal) */}
-      {role === 'MENTOR' && !overlay && !readOnly && showApproveReject && (
-        <div className="px-3 pb-3">
-          <button
-            type="button"
-            onClick={() => onEdit && onEdit(task)}
-            className="text-xs px-3 py-1 rounded-lg font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 transition"
-          >
-            ✏️ Edit (resets to In Progress)
-          </button>
-        </div>
-      )}
-
-      {/* ✅ INTERN: Write Code — only when IN_PROGRESS */}
+      {/* ✅ INTERN: Write Code — TODO and IN_PROGRESS */}
       {showWriteCode && (
         <div className="px-3 pb-3 border-t border-gray-100 pt-2">
           <button
@@ -180,11 +174,11 @@ function KanbanCard({
         </div>
       )}
 
-      {/* INTERN: Show waiting message when in REVIEW */}
+      {/* INTERN: Waiting message when in REVIEW */}
       {role === 'INTERN' && !overlay && !readOnly && isMyTask && isCodeTask && task.status === 'REVIEW' && (
         <div className="px-3 pb-3 border-t border-amber-100 pt-2">
           <p className="text-xs text-amber-700 text-center font-medium">
-            ⏳ AI approved — waiting for mentor to approve
+            ⏳ AI approved — waiting for mentor to approve or reject
           </p>
         </div>
       )}
